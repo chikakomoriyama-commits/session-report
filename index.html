@@ -181,7 +181,8 @@
   .tile .l{font-size:11px;color:var(--text-muted);}
   .dropzone{border:2px dashed var(--border);border-radius:var(--radius-md);padding:26px;text-align:center;color:var(--text-muted);font-size:12.5px;cursor:pointer;background:var(--surface-soft);}
   .dropzone.over{border-color:var(--accent);background:var(--accent-soft);}
-  .speaker-map{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center;margin:10px 0;}
+  .speaker-map{display:grid;grid-template-columns:1fr auto 160px;gap:8px 14px;align-items:center;margin:10px 0;}
+  .spk-name{display:inline-block;font-size:10px;font-weight:700;color:var(--text-muted);margin-right:5px;}
   .seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;}
   .seg button{border:none;background:var(--surface);padding:5px 11px;font-size:11.5px;font-family:inherit;cursor:pointer;color:var(--text-muted);}
   .seg button.on{background:var(--accent);color:#fff;}
@@ -267,7 +268,7 @@
         </div>
         <div id="new-speakers" class="hidden" style="margin-top:14px;">
           <h3 style="font-size:13px;margin:0 0 4px;">話者の割り当て</h3>
-          <p class="hint">検出した話者名を、Consultant（自分）/ Client / 除外 に割り当ててください。</p>
+          <p class="hint">検出した話者名を Consultant / Client / 除外 に割り当ててください。コンサルタントやクライアントが複数いる場合はそれぞれ割り当て、右の欄で表示名（Chica、Danna など）を付けると、表とWordの発言の頭に名前が入ります。</p>
           <div class="speaker-map" id="new-speaker-map"></div>
         </div>
         <div class="row" style="margin-top:14px;justify-content:flex-end;">
@@ -431,6 +432,10 @@ function today(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getM
 function download(name, blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000); }
 function liveRows(r){ return (r||cur).rows.filter(x=>!x.deleted); }
 function numOf(row){ let n=0; for(const r of cur.rows){ if(!r.deleted) n++; if(r===row) return r.deleted?'—':n; } return ''; }
+// 同じ役割（Consultant / Client）に複数人いるときだけ名前ラベルを出す
+function multiRole(role){ const names=new Set(liveRows().filter(r=>r.speaker===role).map(r=>r.name||'')); return names.size>1; }
+function spkLabel(r){ return (r.name && multiRole(r.speaker)) ? r.name : ''; }
+function spkDesc(r){ const base = r.speaker==='C'?'Consultant':'Client'; const l=spkLabel(r); return l ? `${base} (${l})` : base; }
 function tagObj(name){ return tags.find(t=>t.name===name); }
 function tagChip(name, extra=''){ const t=tagObj(name); return `<span class="chip c-${t?.color||'gray'} ${extra}">${esc(name)}</span>`; }
 
@@ -521,6 +526,8 @@ function parseTranscriptText(text){
       const line = raw.trim(); if(!line) continue;
       let m;
       if((m = line.match(/^\[(.+?)\]\s*\d{1,2}:\d{2}(:\d{2})?\s*$/))){ flush(); curSp=m[1].trim(); continue; }
+      // Zoom の Word/テキスト書き出し: 「参加者 1 10:30」「田中 太郎 1:02:15」のように 話者名＋タイムスタンプ だけの行
+      if((m = line.match(/^(.+?)\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/))){ flush(); curSp=m[1].trim(); continue; }
       if((m = line.match(/^(?:\d{1,2}:\d{2}(?::\d{2})?\s+)?([^:：]{1,40})[:：]\s*(.+)$/)) && !/^\d/.test(m[1])){ flush(); curSp=m[1].trim(); buf=[m[2]]; flush(); continue; }
       buf.push(line);
     }
@@ -687,9 +694,12 @@ $('new-parse').onclick = ()=>{
   const map = $('new-speaker-map');
   map.innerHTML = names.map((n,i)=>{
     const cnt = newUtts.filter(u=>u.speaker===n).length;
-    const def = SPEAKER_DEFAULTS[n] || (names.length===2 && i===1 && SPEAKER_DEFAULTS[names[0]] ? 'L' : (names.length===2 && i===0 ? 'C' : 'L'));
+    const anyKnown = names.some(x=>SPEAKER_DEFAULTS[x]);
+    const def = SPEAKER_DEFAULTS[n] || (n==='' ? 'X' : (!anyKnown && i===names.findIndex(x=>x!=='') ? 'C' : 'L'));
+    const defLabel = SPEAKER_DEFAULTS[n] ? 'Chica' : (n||'');
     return `<div>${esc(n||'(話者名なし)')} <span class="hint" style="margin:0;">${cnt}発言</span></div>
-      <div class="seg" data-name="${esc(n)}"><button data-v="C" class="${def==='C'?'on':''}">Consultant</button><button data-v="L" class="${def==='L'?'on':''}">Client</button><button data-v="X" class="${def==='X'?'on':''}">除外</button></div>`;
+      <div class="seg" data-name="${esc(n)}"><button data-v="C" class="${def==='C'?'on':''}">Consultant</button><button data-v="L" class="${def==='L'?'on':''}">Client</button><button data-v="X" class="${def==='X'?'on':''}">除外</button></div>
+      <input type="text" class="spk-label" data-name="${esc(n)}" value="${esc(defLabel)}" placeholder="表示名（任意）" style="padding:5px 9px;font-size:11.5px;">`;
   }).join('');
   map.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.onclick=()=>{ s.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
   $('new-speakers').classList.remove('hidden');
@@ -698,7 +708,7 @@ $('new-parse').onclick = ()=>{
 };
 ['tpl-lang','tpl-notes'].forEach(id=>$(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{ $(id).querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
 $('new-create').onclick = async ()=>{
-  let rows = [], speaker_map = {};
+  let rows = [], speaker_map = {}, payloadConsultant = 'Chica';
   if(newDocxTemplate){
     const lang = $('tpl-lang').querySelector('button.on').dataset.v, notesMode = $('tpl-notes').querySelector('button.on').dataset.v;
     const isJa = t => /[\u3040-\u30ff\u4e00-\u9fff]/.test(t||'');
@@ -716,21 +726,27 @@ $('new-create').onclick = async ()=>{
     });
   } else {
     if(!newUtts) return toast('先に「話者を検出」してください', true);
+    const labels = {};
     document.querySelectorAll('#new-speaker-map .seg').forEach(s=>{ speaker_map[s.dataset.name] = s.querySelector('button.on')?.dataset.v || 'L'; });
+    document.querySelectorAll('#new-speaker-map .spk-label').forEach(i=>{ labels[i.dataset.name] = i.value.trim(); });
     let seq=0;
     for(const u of newUtts){
       const sp = speaker_map[u.speaker]||'L'; if(sp==='X') continue;
+      const name = labels[u.speaker] || u.speaker || '';
       const last = rows[rows.length-1];
-      if(last && last.speaker===sp){ last.ja += ' '+u.text; continue; }
-      rows.push({ id:uid(), seq:++seq, speaker:sp, ja:u.text, en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false });
+      if(last && last.speaker===sp && last.name===name){ last.ja += ' '+u.text; continue; }
+      rows.push({ id:uid(), seq:++seq, speaker:sp, name, ja:u.text, en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false });
     }
+    // Consultant が複数なら見出しの Consultant 欄に連名を入れる
+    const cNames = [...new Set(rows.filter(r=>r.speaker==='C').map(r=>r.name).filter(Boolean))];
+    if(cNames.length>1) payloadConsultant = cNames.join(' / ');
     rows.forEach((r,i)=>r.seq=i+1);
   }
   if(!rows.length) return toast('取り込める発言がありません', true);
   const payload = {
     title: $('new-title').value.trim() || `${$('new-client').value.trim()||'Session'} ${fmtDate($('new-date').value)}`,
     client_label: $('new-client').value.trim(), session_date: $('new-date').value||null, length_min: parseInt($('new-length').value)||null,
-    raw_transcript: $('new-text').value || null, speaker_map, rows,
+    raw_transcript: $('new-text').value || null, speaker_map, rows, consultant: payloadConsultant,
     status: newDocxTemplate ? (rows.some(r=>r.robert_en||r.robert_ja) ? 'reviewed' : 'self_review') : 'draft',
   };
   if(newDocxTemplate){
@@ -817,7 +833,7 @@ function renderTable(){
     if(r.deleted && !showDel) continue;
     if(onlyNotes && !(r.note_ja||r.note_en||r.robert_en||r.robert_ja)) continue;
     const num = r.deleted ? '—' : n;
-    const textCell = `${showJa?`<div class="cell-text ja" contenteditable="true" data-id="${r.id}" data-f="ja">${esc(r.ja)}</div>`:''}
+    const textCell = `${spkLabel(r)?`<span class="spk-name" data-rename="${r.id}" title="クリックで表示名を変更" style="cursor:pointer;">${esc(spkLabel(r))}</span>`:''}${showJa?`<div class="cell-text ja" contenteditable="true" data-id="${r.id}" data-f="ja">${esc(r.ja)}</div>`:''}
       ${showEn?`<div class="cell-text en" contenteditable="true" data-id="${r.id}" data-f="en" ${showJa?'':''}>${esc(r.en)}</div>`:''}
       <div class="row-actions">
         <button class="btn btn-xs" data-act="toggle" data-id="${r.id}">${r.deleted?'復元':'削除'}</button>
@@ -834,7 +850,7 @@ function renderTable(){
       </div>` : (curStep>=5 ? `<div class="tagrow"><span class="tag-add" data-id="${r.id}" data-rob="1" style="color:var(--rose);">＋ロバートのコメント</span>${(r.note_ja||r.note_en)?`<span class="tag-add" data-swap="${r.id}" title="このメモをロバートのコメントにする">→Robert</span>`:''}</div>`:'');
     html.push(`<tr class="${r.deleted?'deleted':''}" data-id="${r.id}">
       <td class="num">${num}<span class="seq">(${r.seq})</span></td>
-      <td class="spk"><span class="spk-btn spk-${r.speaker}" data-id="${r.id}" title="クリックで話者を入れ替え">${r.speaker==='C'?'Cons.':'Client'}</span></td>
+      <td class="spk"><span class="spk-btn spk-${r.speaker}" data-id="${r.id}" title="クリックで Consultant / Client を入れ替え">${r.speaker==='C'?'Cons.':'Client'}</span></td>
       <td>${r.speaker==='C'?textCell:''}</td>
       <td>${r.speaker==='L'?textCell:''}</td>
       <td>${ownNote}${robert}</td>
@@ -847,6 +863,7 @@ function renderTable(){
     el.addEventListener('input', ()=>{ const r=cur.rows.find(x=>x.id===el.dataset.id); r[el.dataset.f]=el.innerText.replace(/\n$/,''); el.classList.toggle('is-empty', !r[el.dataset.f] && el.classList.contains('note-own')); markDirty(); });
     el.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey && el.dataset.f!=='ja' && el.dataset.f!=='en'){ /* allow */ } });
   });
+  body.querySelectorAll('[data-rename]').forEach(b=>b.onclick=()=>{ const r=cur.rows.find(x=>x.id===b.dataset.rename); const v=prompt('表示名（同じ名前の行すべてを変更します）', r.name||''); if(v===null) return; const old=r.name; cur.rows.forEach(x=>{ if(x.speaker===r.speaker && x.name===old) x.name=v.trim(); }); markDirty(); renderTable(); });
   body.querySelectorAll('.spk-btn').forEach(b=>b.onclick=()=>{ const r=cur.rows.find(x=>x.id===b.dataset.id); r.speaker = r.speaker==='C'?'L':'C'; markDirty(); renderTable(); });
   body.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>rowAction(b.dataset.act, b.dataset.id));
   body.querySelectorAll('.tag-add').forEach(b=>b.onclick=e=>{ if(b.dataset.rob){ const r=cur.rows.find(x=>x.id===b.dataset.id); r.robert_en=' '; markDirty(); renderTable(); setTimeout(()=>body.querySelector(`.cell-text[data-id="${r.id}"][data-f="robert_en"]`)?.focus(),0); } else openTagPopover(e, b.dataset.id); });
@@ -858,15 +875,15 @@ function rowAction(act, id){
   const i = cur.rows.findIndex(x=>x.id===id); const r = cur.rows[i];
   if(act==='toggle'){ r.deleted=!r.deleted; }
   if(act==='merge'){ let j=i-1; while(j>=0 && cur.rows[j].deleted) j--; if(j<0) return toast('上に行がありません', true); const p=cur.rows[j];
-    if(p.speaker!==r.speaker && !confirm('話者が違います。それでも結合しますか？')) return;
+    if((p.speaker!==r.speaker || (p.name||'')!==(r.name||'')) && !confirm('話者が違います。それでも結合しますか？')) return;
     p.ja=(p.ja+' '+r.ja).trim(); p.en=(p.en+' '+r.en).trim(); p.note_ja=[p.note_ja,r.note_ja].filter(Boolean).join('\n'); p.note_en=[p.note_en,r.note_en].filter(Boolean).join('\n'); p.robert_en=[p.robert_en,r.robert_en].filter(Boolean).join('\n'); p.robert_ja=[p.robert_ja,r.robert_ja].filter(Boolean).join('\n'); p.tags=[...new Set([...(p.tags||[]),...(r.tags||[])])]; cur.rows.splice(i,1); }
-  if(act==='insert'){ cur.rows.splice(i+1,0,{ id:uid(), seq:r.seq, speaker:r.speaker==='C'?'L':'C', ja:'', en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false, inserted:true }); }
+  if(act==='insert'){ cur.rows.splice(i+1,0,{ id:uid(), seq:r.seq, speaker:r.speaker==='C'?'L':'C', name:'', ja:'', en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false, inserted:true }); }
   if(act==='split'){
     const el = document.querySelector(`.cell-text[data-id="${id}"][data-f="ja"]`); const sel=window.getSelection();
     let pos = (el && sel && sel.anchorNode && el.contains(sel.anchorNode)) ? getCaretPos(el) : -1;
     if(pos<=0 || pos>=r.ja.length){ const s=prompt('分割位置の直後の文字列（先頭数文字）を入力してください'); if(!s) return; pos=r.ja.indexOf(s); if(pos<=0) return toast('見つかりません', true); }
     const rest = r.ja.slice(pos).trim(); r.ja = r.ja.slice(0,pos).trim();
-    cur.rows.splice(i+1,0,{ id:uid(), seq:r.seq, speaker:r.speaker, ja:rest, en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false, inserted:true });
+    cur.rows.splice(i+1,0,{ id:uid(), seq:r.seq, speaker:r.speaker, name:r.name||'', ja:rest, en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false, inserted:true });
   }
   markDirty(); renderTable();
 }
@@ -941,7 +958,7 @@ function renderPanel(){
     <div class="fld"><label>次のセッションで試すこと</label><textarea id="learn-next" rows="3">${esc(L.next||'')}</textarea></div>
     <div class="fld"><label>このセッションのテーマ・タグ</label><div class="row" id="learn-tags">${cur.learning_tags.map(t=>tagChip(t,'clickable')).join('')}<span class="tag-add" id="learn-tag-add">＋タグ</span></div></div>
     <div class="row"><button class="btn btn-bob btn-sm" id="act-summarize">Bob: ロバートのコメントから学びの下書きを作る</button><span id="prog-6"></span><span style="flex:1"></span><button class="btn btn-primary" id="act-to-done">学び整理済みにする</button></div>
-    ${marked.length?`<details style="margin-top:14px;"><summary class="hint" style="cursor:pointer;">ロバートのコメント一覧（${marked.length}）</summary>${marked.map(r=>`<div class="learn-item"><div class="ctx">#${numOf(r)} ${r.speaker==='C'?'Consultant':'Client'}: ${esc((r.ja||r.en).slice(0,80))}${(r.ja||r.en).length>80?'…':''}</div><div class="rb">${esc(r.robert_ja||r.robert_en)}</div><div class="tagrow">${(r.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}</details>`:''}
+    ${marked.length?`<details style="margin-top:14px;"><summary class="hint" style="cursor:pointer;">ロバートのコメント一覧（${marked.length}）</summary>${marked.map(r=>`<div class="learn-item"><div class="ctx">#${numOf(r)} ${esc(spkDesc(r))}: ${esc((r.ja||r.en).slice(0,80))}${(r.ja||r.en).length>80?'…':''}</div><div class="rb">${esc(r.robert_ja||r.robert_en)}</div><div class="tagrow">${(r.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}</details>`:''}
     </div>`;
   }
   p.innerHTML = h;
@@ -994,7 +1011,7 @@ async function bobClean(){
 - 出力は入力と同じ件数・同じ i を持つ JSON 配列のみ: [{"i":番号,"t":"整形後テキスト"}]。説明文は不要。`;
   try{
     const results = await runBatches(live, 40, async (chunk)=>{
-      const inp = chunk.map(r=>({ i:r.seq, s:r.speaker==='C'?'Consultant':'Client', t:r.ja }));
+      const inp = chunk.map(r=>({ i:r.seq, s:spkDesc(r), t:r.ja }));
       const txt = await callClaude(sys, JSON.stringify(inp), 12000);
       const arr = parseJsonLoose(txt);
       return chunk.map(r=>{ const m=arr.find(x=>x.i===r.seq); return { id:r.id, t:(m&&typeof m.t==='string'&&m.t.trim())?m.t.trim():r.ja }; });
@@ -1012,7 +1029,7 @@ async function bobTranslate(all){
   const live = liveRows();
   const targets = live.filter(r=> all || !r.en || (r.note_ja && !r.note_en));
   if(!targets.length) return toast('未訳の行はありません');
-  const sys = `You are translating a Japanese structural-consulting session transcript into English so that Robert Fritz can review the consultant's work. Consultant = ${cur.consultant||'Chica'}. Client = ${cur.client_label||'the client'}.
+  const sys = `You are translating a Japanese structural-consulting session transcript into English so that Robert Fritz can review the consultant's work. Consultant = ${cur.consultant||'Chica'}. Client = ${cur.client_label||'the client'}.${(multiRole('C')||multiRole('L'))?' Note: more than one person shares a role in this session; the speaker field gives the person\'s name in parentheses. Do not add the names to the translation.':''}
 Translation rules:
 ${getRules()}
 Glossary (Japanese → English, always use these):
@@ -1021,8 +1038,8 @@ Output: a JSON array only, same count and same "i" as input: [{"i":number,"en":"
   try{
     const results = await runBatches(targets, 25, async (chunk)=>{
       // 文脈として前後2行を添える
-      const ctx = i => { const k=live.indexOf(i); return live.slice(Math.max(0,k-2),k).map(r=>`${r.speaker==='C'?'Consultant':'Client'}: ${r.ja}`).join('\n'); };
-      const inp = chunk.map(r=>({ i:r.seq, speaker:r.speaker==='C'?'Consultant':'Client', ja:r.ja, note_ja:r.note_ja||'', context_before:ctx(r) }));
+      const ctx = i => { const k=live.indexOf(i); return live.slice(Math.max(0,k-2),k).map(r=>`${spkDesc(r)}: ${r.ja}`).join('\n'); };
+      const inp = chunk.map(r=>({ i:r.seq, speaker:spkDesc(r), ja:r.ja, note_ja:r.note_ja||'', context_before:ctx(r) }));
       const txt = await callClaude(sys, JSON.stringify(inp), 16000);
       const arr = parseJsonLoose(txt);
       return chunk.map(r=>{ const m=arr.find(x=>x.i===r.seq)||{}; return { id:r.id, en:m.en||'', note_en:m.note_en||'' }; });
@@ -1065,7 +1082,8 @@ async function exportWord(mode, store=false){
   const rows = [ new D.TableRow({ children:hdr, tableHeader:true }) ];
   let n=0;
   for(const r of live){ n++;
-    const textParts = mode==='en' ? [{text:r.en||r.ja}] : mode==='ja' ? [{text:r.ja}] : [{text:r.ja},{text:r.en,color:'3F4C5A'}];
+    const pre = spkLabel(r) ? spkLabel(r)+': ' : '';
+    const textParts = mode==='en' ? [{text:pre+(r.en||r.ja)}] : mode==='ja' ? [{text:pre+r.ja}] : [{text:pre+r.ja},{text:pre+r.en,color:'3F4C5A'}];
     const noteParts = [];
     if(mode==='en'){ noteParts.push({text:r.note_en||r.note_ja}); if(store===false && r.robert_en) noteParts.push({text:r.robert_en, color:'9C3B2E', label:'Robert'}); }
     else if(mode==='ja'){ noteParts.push({text:r.note_ja}); if(r.robert_ja||r.robert_en) noteParts.push({text:r.robert_ja||r.robert_en, color:'9C3B2E', label:'Robert'}); }
@@ -1162,7 +1180,7 @@ ${glossaryText()}
   try{
     if(targets.length){
       const results = await runBatches(targets, 20, async chunk=>{
-        const inp = chunk.map(r=>({ i:r.seq, context:`${r.speaker==='C'?'Consultant':'Client'}: ${r.en||r.ja}`, own_note:r.note_en||'', robert:r.robert_en }));
+        const inp = chunk.map(r=>({ i:r.seq, context:`${spkDesc(r)}: ${r.en||r.ja}`, own_note:r.note_en||'', robert:r.robert_en }));
         const arr = parseJsonLoose(await callClaude(sys, JSON.stringify(inp), 12000));
         return chunk.map(r=>({ id:r.id, ja:(arr.find(x=>x.i===r.seq)||{}).ja||'' }));
       }, (d,t)=>setProgress($('prog-5'), d, t, '和訳中'));
@@ -1182,7 +1200,7 @@ ${glossaryText()}
 async function bobLearningDraft(){
   if(!requireKey()) return;
   const live = liveRows();
-  const items = live.filter(r=>r.robert_en).map(r=>`#${numOf(r)} [${r.speaker==='C'?'Consultant':'Client'}: ${(r.en||r.ja).slice(0,160)}]\n  own note: ${r.note_en||r.note_ja||'-'}\n  Robert: ${r.robert_en}`).join('\n');
+  const items = live.filter(r=>r.robert_en).map(r=>`#${numOf(r)} [${spkDesc(r)}: ${(r.en||r.ja).slice(0,160)}]\n  own note: ${r.note_en||r.note_ja||'-'}\n  Robert: ${r.robert_en}`).join('\n');
   if(!items && !cur.robert_overall_en) return toast('ロバートのコメントがまだありません', true);
   const sys = `あなたは構造コンサルティングを学ぶコンサルタントの学習パートナーです。ロバート・フリッツのレビューコメントをもとに、本人が自分の言葉で書き直すための「学びの下書き」を日本語で作ります。
 - ロバートが繰り返し指摘しているパターン、うまくいった点（Good）、次回に試す具体的な問いかけの3点を、箇条書き（■）で簡潔に。
@@ -1239,7 +1257,7 @@ async function renderLearning(fromCache){
     if(!cs.length && !memoHit) continue;
     h += `<div class="card"><div class="row" style="margin-bottom:8px;"><b><a href="#r/${r.id}" style="text-decoration:none;">${esc(r.title||'(無題)')}</a></b><span class="hint" style="margin:0;">${fmtDate(r.session_date)} · ${esc(r.client_label||'')}</span>${(r.learning_tags||[]).map(t=>tagChip(t)).join('')}<span class="status st-${r.status}" style="margin-left:auto;">${STATUS_LABEL[r.status]||''}</span></div>
       ${memoHit?`<div style="font-size:12.5px;line-height:1.8;margin-bottom:10px;">${L.insights?`<div><b style="font-size:11px;color:var(--text-muted);">気づき</b><div style="white-space:pre-wrap;">${esc(L.insights)}</div></div>`:''}${L.dialogue?`<div style="margin-top:6px;"><b style="font-size:11px;color:var(--text-muted);">ロバートと深めた点</b><div style="white-space:pre-wrap;">${esc(L.dialogue)}</div></div>`:''}${L.next?`<div style="margin-top:6px;"><b style="font-size:11px;color:var(--text-muted);">次に試すこと</b><div style="white-space:pre-wrap;">${esc(L.next)}</div></div>`:''}</div>`:''}
-      ${cs.map(c=>`<div class="learn-item"><div class="ctx">#${c.num} ${c.row.speaker==='C'?'Consultant':'Client'}: ${esc((c.row.ja||c.row.en).slice(0,100))}${(c.row.ja||c.row.en).length>100?'…':''}</div><div class="rb">${esc(c.row.robert_ja||c.row.robert_en)}</div>${c.row.robert_ja&&c.row.robert_en?`<div class="rb" style="color:#3F4C5A;font-size:11.5px;margin-top:3px;">${esc(c.row.robert_en)}</div>`:''}<div class="tagrow">${(c.row.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}
+      ${cs.map(c=>`<div class="learn-item"><div class="ctx">#${c.num} ${c.row.speaker==='C'?'Consultant':'Client'}${c.row.name?' ('+esc(c.row.name)+')':''}: ${esc((c.row.ja||c.row.en).slice(0,100))}${(c.row.ja||c.row.en).length>100?'…':''}</div><div class="rb">${esc(c.row.robert_ja||c.row.robert_en)}</div>${c.row.robert_ja&&c.row.robert_en?`<div class="rb" style="color:#3F4C5A;font-size:11.5px;margin-top:3px;">${esc(c.row.robert_en)}</div>`:''}<div class="tagrow">${(c.row.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}
     </div>`;
   }
   $('learn-body').innerHTML = h || '<div class="empty">まだ学びがありません。レポートのステップ⑤⑥で、ロバートのコメントにタグをつけたり学びを書いたりすると、ここに集まります。</div>';
