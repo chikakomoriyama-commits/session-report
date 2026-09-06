@@ -103,6 +103,9 @@
   .st-reviewed{background:var(--rose-soft);color:var(--rose);}
   .st-learned{background:var(--sage-soft);color:var(--sage);}
 
+  .title-edit{font-size:18px;font-weight:700;background:transparent;border:1px dashed var(--border);padding:4px 8px;margin-left:-8px;width:auto;min-width:320px;}
+  .title-edit:hover{background:var(--surface);border-style:solid;}
+  .title-edit:focus{background:var(--surface);border-style:solid;}
   /* Steps */
   .steps{display:flex;gap:4px;margin-bottom:18px;background:var(--surface);border:1px solid var(--border-soft);border-radius:999px;padding:4px;box-shadow:var(--shadow);overflow-x:auto;}
   .step{flex:1;text-align:center;padding:8px 10px;border-radius:999px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap;transition:all .15s;}
@@ -277,6 +280,16 @@
           <button class="btn btn-primary" id="new-create" disabled>取り込んで保存</button>
         </div>
       </div>
+      <div class="card">
+        <h3>過去のレポートをまとめて取り込む（保管用）</h3>
+        <p class="hint">ロバートから返ってきた過去のWord（テンプレート形式）を複数まとめて選ぶと、1ファイル＝1レポートとして「レビュー受領」状態で保管します。本文の言語はファイルごとに自動判定、日付・Client・長さは見出し行から、タイトルはファイル名から入ります。取り込み後、各レポートを開いて必要なところだけ直せます（表の各行「⇄」でメモとロバートのコメントを入れ替え可）。</p>
+        <div class="row" style="gap:18px;margin-bottom:12px;">
+          <label class="chip clickable">Notes列の扱い：</label>
+          <div class="seg" id="bulk-notes"><button data-v="split" class="on">英語=ロバート / 日本語=自分</button><button data-v="robert">すべてロバート</button><button data-v="own">すべて自分のメモ</button></div>
+        </div>
+        <div class="dropzone" id="bulk-drop">ここに複数の .docx をドロップ、またはクリックして選択</div><input type="file" id="bulk-file" accept=".docx" multiple class="hidden">
+        <div id="bulk-log" style="margin-top:12px;font-size:12px;line-height:1.9;"></div>
+      </div>
     </section>
 
     <!-- REPORT DETAIL -->
@@ -288,7 +301,7 @@
             <span id="rep-status" class="status"></span>
             <span id="rep-saving" class="hint" style="margin:0;"></span>
           </div>
-          <input type="text" id="rep-title" style="font-size:18px;font-weight:700;background:transparent;border-color:transparent;padding:4px 6px;margin-left:-6px;" placeholder="タイトル">
+          <div class="row" style="gap:6px;"><input type="text" id="rep-title" class="title-edit" placeholder="タイトル（クリックして編集）" title="クリックして編集"><span class="hint" style="margin:0;font-size:11px;">✎ クリックで編集</span></div>
           <div class="row" style="margin-top:6px;gap:8px;">
             <input type="text" id="rep-consultant" style="width:110px;" placeholder="Consultant">
             <input type="text" id="rep-client" style="width:130px;" placeholder="Client (匿名)">
@@ -770,6 +783,62 @@ $('new-create').onclick = async ()=>{
   await loadAll();
   location.hash = '#r/'+data.id;
 };
+
+/* ============ BULK ARCHIVE IMPORT ============ */
+$('bulk-notes').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('bulk-notes').querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
+$('bulk-drop').onclick = ()=> $('bulk-file').click();
+$('bulk-drop').ondragover = e=>{ e.preventDefault(); $('bulk-drop').classList.add('over'); };
+$('bulk-drop').ondragleave = ()=> $('bulk-drop').classList.remove('over');
+$('bulk-drop').ondrop = e=>{ e.preventDefault(); $('bulk-drop').classList.remove('over'); bulkImport([...e.dataTransfer.files]); };
+$('bulk-file').onchange = e=>{ bulkImport([...e.target.files]); $('bulk-file').value=''; };
+function rowsFromTemplate(tpl, lang, notesMode){
+  const isJa = t => /[\u3040-\u30ff\u4e00-\u9fff]/.test(t||'');
+  return tpl.rows.map((r,i)=>{
+    const row = { id:uid(), seq:i+1, speaker:r.speaker, name:'', ja:lang==='ja'?r.text:'', en:lang==='en'?r.text:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false };
+    const n = r.note||''; if(!n) return row;
+    if(notesMode==='own'){ if(isJa(n)) row.note_ja=n; else row.note_en=n; }
+    else if(notesMode==='robert'){ if(isJa(n)) row.robert_ja=n; else row.robert_en=n; }
+    else { const ps = n.split('\n').map(x=>x.trim()).filter(Boolean); row.robert_en = ps.filter(x=>!isJa(x)).join('\n'); row.note_ja = ps.filter(isJa).join('\n'); }
+    return row;
+  });
+}
+async function bulkImport(files){
+  files = files.filter(f=>/\.docx$/i.test(f.name));
+  if(!files.length) return toast('.docx ファイルを選んでください', true);
+  const notesMode = $('bulk-notes').querySelector('button.on').dataset.v;
+  const log = $('bulk-log'); log.innerHTML = '';
+  const line = (msg, ok=true)=>{ log.innerHTML += `<div style="color:${ok?'var(--text)':'var(--rose)'}">${msg}</div>`; };
+  const isJaP = p => (p.match(/[\u3040-\u30ff\u4e00-\u9fff]/g)||[]).length > p.length*0.2;
+  let done=0;
+  for(const f of files){
+    try{
+      const blocks = await parseDocx(await f.arrayBuffer());
+      const tpl = templateFromDocx(blocks);
+      if(!tpl){ line(`✕ ${esc(f.name)} — テンプレート形式の表が見つかりません（スキップ）`, false); continue; }
+      const lang = tpl.rows.filter(r=>r.text && !/[\u3040-\u30ff\u4e00-\u9fff]/.test(r.text)).length > tpl.rows.length/2 ? 'en' : 'ja';
+      const rows = rowsFromTemplate(tpl, lang, notesMode);
+      let date=null; if(tpl.head.date){ const d=new Date(tpl.head.date); if(!isNaN(d)) date=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+      if(!date){ const m=f.name.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/); if(m) date=`${m[1]}-${m[2]}-${m[3]}`; }
+      const ex = [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
+      const hasRobert = rows.some(r=>r.robert_en||r.robert_ja) || ex.length>0;
+      const payload = {
+        title: f.name.replace(/\.docx$/i,''), consultant: (tpl.head.consultant && !/\t/.test(tpl.head.consultant)) ? tpl.head.consultant : 'Chica',
+        client_label: tpl.head.client||'', session_date: date, length_min: tpl.head.length||null, rows,
+        status: hasRobert ? 'reviewed' : 'self_review',
+        robert_overall_en: ex.filter(p=>!isJaP(p)).join('\n\n') || null, robert_overall_ja: ex.filter(isJaP).join('\n\n') || null,
+      };
+      const { data, error } = await supabase.from('sc_reports').insert(payload).select().single();
+      if(error){ line(`✕ ${esc(f.name)} — ${esc(error.message)}`, false); continue; }
+      const path = `${data.id}/returned_${Date.now()}_${f.name}`;
+      const { error:sErr } = await supabase.storage.from(BUCKET).upload(path, f);
+      if(!sErr) await supabase.from('sc_reports').update({ files:[{kind:'returned', path, name:f.name, at:new Date().toISOString()}] }).eq('id', data.id);
+      done++;
+      line(`✓ <a href="#r/${data.id}">${esc(payload.title)}</a> — ${rows.length}行 · ${lang==='en'?'英語':'日本語'} · ${fmtDate(date)||'日付不明'} · ${esc(tpl.head.client||'')}${hasRobert?' · ロバートのコメントあり':''}`);
+    }catch(e){ line(`✕ ${esc(f.name)} — ${esc(e.message)}`, false); }
+  }
+  await loadAll();
+  toast(`${done} / ${files.length} 件を取り込みました`);
+}
 
 /* ============ REPORT: load / save ============ */
 async function openReport(id){
