@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js"></script>
+<style>
+  :root{
+    --bg:#FAF7F0; --surface:#FFFFFF; --surface-soft:#FBF8F2;
+    --border:#E9E2D3; --border-soft:#F0EBDE;
+    --text:#2E2A22; --text-muted:#948B78; --text-faint:#B9B0A0;
+    --accent:#C17A4E; --accent-soft:#F3E3D5; --accent-deep:#9C5A32;
+    --sage:#7C8A6A; --sage-soft:#E7EBDF;
+    --amber:#C89A3E; --amber-soft:#F5EBD3;
+    --rose:#BD6B5C; --rose-soft:#F3E0DB;
+    --blue:#5E7C99; --blue-soft:#E1E9F0;
+    --gray-soft:#EDEAE2;
+    --radius-lg:18px; --radius-md:12px; --radius-sm:8px;
+    --shadow: 0 1px 2px rgba(60,50,30,0.04), 0 6px 20px rgba(60,50,30,0.05);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Noto Sans JP",-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;font-size:13px;}
+  .app{display:flex;min-height:100vh;}
+  .hidden{display:none !important;}
+  a{color:var(--accent-deep);}
+
+  /* Sidebar */
+  .sidebar{width:224px;flex-shrink:0;background:var(--surface-soft);border-right:1px solid var(--border-soft);padding:26px 16px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh;}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 8px;}
+  .brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;letter-spacing:.5px;}
+  .brand-text{display:flex;flex-direction:column;line-height:1.25;}
+  .brand-text .name{font-weight:700;font-size:14.5px;}
+  .brand-text .sub{font-size:10.5px;color:var(--text-muted);}
+  .nav{display:flex;flex-direction:column;gap:3px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);color:var(--text-muted);cursor:pointer;font-size:13px;font-weight:500;border:1px solid transparent;transition:background .15s,color .15s;}
+  .nav-item:hover{background:var(--gray-soft);color:var(--text);}
+  .nav-item.active{background:var(--surface);color:var(--accent-deep);border-color:var(--border);box-shadow:var(--shadow);font-weight:600;}
+  .nav-item .ico{width:17px;height:17px;flex-shrink:0;opacity:.75;}
+  .sidebar-foot{margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--border-soft);font-size:11px;color:var(--text-faint);line-height:1.7;}
+  .sidebar-foot a{color:var(--text-muted);cursor:pointer;text-decoration:underline;}
+
+  /* Main */
+  .main{flex:1;min-width:0;padding:26px 34px 80px;}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap;gap:12px;}
+  .page-head h1{font-size:20px;margin:0 0 4px;font-weight:700;}
+  .page-head .desc{font-size:12.5px;color:var(--text-muted);margin:0;max-width:640px;line-height:1.6;}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit;}
+  .btn:hover{border-color:var(--accent);color:var(--accent-deep);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff;}
+  .btn-ghost{border-color:transparent;background:transparent;}
+  .btn-ghost:hover{background:var(--gray-soft);border-color:transparent;color:var(--text);}
+  .btn-sm{padding:5px 11px;font-size:11.5px;}
+  .btn-xs{padding:3px 8px;font-size:10.5px;border-radius:6px;}
+  .btn-danger:hover{border-color:var(--rose);color:var(--rose);}
+  .btn-bob{background:var(--blue-soft);border-color:var(--blue-soft);color:var(--blue);}
+  .btn-bob:hover{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+  .search{flex:1;min-width:220px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:8px 15px;color:var(--text-muted);font-size:13px;}
+  .search input{border:none;outline:none;background:transparent;font-size:13px;color:var(--text);width:100%;font-family:inherit;}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);white-space:nowrap;}
+  .chip.sel,.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep);}
+  .chip.clickable{cursor:pointer;}
+  .chip .x{opacity:.5;cursor:pointer;margin-left:2px;}
+  .chip.c-accent{background:var(--accent-soft);color:var(--accent-deep);border-color:transparent;}
+  .chip.c-sage{background:var(--sage-soft);color:var(--sage);border-color:transparent;}
+  .chip.c-amber{background:var(--amber-soft);color:#8A6A24;border-color:transparent;}
+  .chip.c-rose{background:var(--rose-soft);color:var(--rose);border-color:transparent;}
+  .chip.c-gray{background:var(--gray-soft);color:var(--text-muted);border-color:transparent;}
+  .chip.c-blue{background:var(--blue-soft);color:var(--blue);border-color:transparent;}
+
+  .card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:20px 22px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .card h3{margin:0 0 10px;font-size:14px;font-weight:700;}
+  .card .hint{font-size:11.5px;color:var(--text-muted);line-height:1.7;margin:0 0 12px;}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .fld{margin-bottom:12px;}
+  .fld label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;}
+  input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],textarea,select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--surface-soft);color:var(--text);}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;line-height:1.7;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .grid4{display:grid;grid-template-columns:2fr 1.2fr 1.2fr .8fr;gap:12px;}
+
+  /* Library list */
+  .rep-list{display:flex;flex-direction:column;gap:9px;}
+  .rep-item{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-md);padding:14px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .15s;box-shadow:var(--shadow);}
+  .rep-item:hover{border-color:var(--accent);transform:translateY(-1px);}
+  .rep-item .date{font-size:11.5px;color:var(--text-muted);width:84px;flex-shrink:0;}
+  .rep-item .ttl{font-weight:600;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rep-item .meta{font-size:11px;color:var(--text-muted);}
+  .status{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .st-draft{background:var(--gray-soft);color:var(--text-muted);}
+  .st-self_review{background:var(--amber-soft);color:#8A6A24;}
+  .st-translated{background:var(--blue-soft);color:var(--blue);}
+  .st-submitted{background:var(--accent-soft);color:var(--accent-deep);}
+  .st-reviewed{background:var(--rose-soft);color:var(--rose);}
+  .st-learned{background:var(--sage-soft);color:var(--sage);}
+
+  /* Steps */
+  .steps{display:flex;gap:4px;margin-bottom:18px;background:var(--surface);border:1px solid var(--border-soft);border-radius:999px;padding:4px;box-shadow:var(--shadow);overflow-x:auto;}
+  .step{flex:1;text-align:center;padding:8px 10px;border-radius:999px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap;transition:all .15s;}
+  .step:hover{background:var(--gray-soft);color:var(--text);}
+  .step.active{background:var(--accent);color:#fff;}
+  .step .n{display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--gray-soft);color:var(--text-muted);font-size:10.5px;line-height:18px;margin-right:5px;}
+  .step.active .n{background:rgba(255,255,255,.25);color:#fff;}
+  .step.done .n{background:var(--sage-soft);color:var(--sage);}
+
+  /* Transcript table */
+  .tt-wrap{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;}
+  .tt-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border-soft);background:var(--surface-soft);position:sticky;top:0;z-index:5;}
+  table.tt{width:100%;border-collapse:collapse;table-layout:fixed;}
+  table.tt th{font-size:11px;color:var(--text-muted);text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);background:var(--surface);font-weight:700;}
+  table.tt td{vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--border-soft);font-size:12.5px;line-height:1.75;}
+  table.tt tr:hover td{background:#FDFBF6;}
+  table.tt tr.deleted td{opacity:.45;background:var(--gray-soft);}
+  table.tt tr.deleted .cell-text{text-decoration:line-through;}
+  table.tt td.num{width:52px;color:var(--text-muted);font-size:11px;white-space:nowrap;}
+  table.tt td.num .seq{display:block;font-size:9.5px;color:var(--text-faint);}
+  table.tt td.spk{width:54px;}
+  .spk-btn{display:inline-block;padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:700;cursor:pointer;border:1px solid transparent;}
+  .spk-C{background:var(--accent-soft);color:var(--accent-deep);}
+  .spk-L{background:var(--sage-soft);color:var(--sage);}
+  .cell-text{white-space:pre-wrap;word-break:break-word;outline:none;border-radius:6px;padding:2px 4px;margin:-2px -4px;min-height:1.6em;}
+  .cell-text:focus{background:#fff;box-shadow:0 0 0 2px var(--accent-soft);}
+  .cell-text.en{color:#3F4C5A;}
+  .cell-text.ja+.cell-text.en{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border-soft);}
+  .lang-tag{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.5px;display:block;margin-bottom:1px;}
+  .note-own{background:var(--amber-soft);border-radius:6px;padding:4px 7px;}
+  .note-own.is-empty{background:transparent;}
+  .cell-text[data-ph]:empty::before{content:attr(data-ph);color:var(--text-faint);}
+  .note-robert{background:var(--rose-soft);border-radius:6px;padding:5px 8px;margin-top:6px;border-left:3px solid var(--rose);}
+  .note-robert .who{font-size:9.5px;font-weight:700;color:var(--rose);letter-spacing:.5px;display:block;margin-bottom:2px;}
+  .note-robert .ja{margin-top:4px;padding-top:4px;border-top:1px dashed rgba(189,107,92,.3);}
+  .row-actions{display:flex;gap:3px;margin-top:5px;opacity:0;transition:opacity .15s;}
+  tr:hover .row-actions{opacity:1;}
+  .tagrow{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;align-items:center;}
+  .tag-add{font-size:10px;color:var(--text-faint);cursor:pointer;border:1px dashed var(--border);border-radius:999px;padding:2px 7px;}
+  .tag-add:hover{color:var(--accent-deep);border-color:var(--accent);}
+  .learn-mark{cursor:pointer;font-size:12px;opacity:.35;}
+  .learn-mark.on{opacity:1;}
+
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(46,42,34,.35);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .modal{background:var(--surface);border-radius:var(--radius-lg);padding:26px 28px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow:auto;}
+  .modal.wide{max-width:820px;}
+  .modal h3{margin:0 0 14px;font-size:15px;}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+  .warn-note{font-size:11.5px;color:var(--text-muted);background:var(--amber-soft);border-radius:var(--radius-sm);padding:9px 12px;line-height:1.6;margin-bottom:12px;}
+  .tag-popover{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow);padding:10px;z-index:40;display:flex;flex-wrap:wrap;gap:5px;max-width:320px;}
+
+  /* Login */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:34px 36px;width:100%;max-width:380px;box-shadow:var(--shadow);}
+  .login-card .brand{margin-bottom:22px;padding:0;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:#fff;padding:10px 18px;border-radius:999px;font-size:12.5px;opacity:0;transition:all .2s;z-index:100;pointer-events:none;max-width:80vw;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--rose);}
+  .progress{font-size:11.5px;color:var(--blue);background:var(--blue-soft);border-radius:999px;padding:5px 12px;display:inline-flex;gap:8px;align-items:center;}
+  .spin{width:12px;height:12px;border:2px solid rgba(94,124,153,.3);border-top-color:var(--blue);border-radius:50%;animation:sp .8s linear infinite;display:inline-block;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .empty{padding:40px;text-align:center;color:var(--text-faint);font-size:12.5px;}
+  .kv{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-bottom:12px;}
+  .kv b{color:var(--text);font-weight:600;}
+  .overall{white-space:pre-wrap;line-height:1.8;font-size:12.5px;}
+  .overall.en{color:#3F4C5A;}
+  .learn-item{border-left:3px solid var(--accent-soft);padding:8px 12px;margin-bottom:10px;background:var(--surface-soft);border-radius:0 8px 8px 0;}
+  .learn-item .ctx{font-size:11px;color:var(--text-muted);margin-bottom:4px;}
+  .learn-item .rb{font-size:12.5px;line-height:1.7;white-space:pre-wrap;}
+  .stat-tiles{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .tile{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-md);padding:10px 14px;min-width:110px;cursor:pointer;}
+  .tile:hover,.tile.sel{border-color:var(--accent);}
+  .tile .n{font-size:20px;font-weight:700;}
+  .tile .l{font-size:11px;color:var(--text-muted);}
+  .dropzone{border:2px dashed var(--border);border-radius:var(--radius-md);padding:26px;text-align:center;color:var(--text-muted);font-size:12.5px;cursor:pointer;background:var(--surface-soft);}
+  .dropzone.over{border-color:var(--accent);background:var(--accent-soft);}
+  .speaker-map{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center;margin:10px 0;}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;}
+  .seg button{border:none;background:var(--surface);padding:5px 11px;font-size:11.5px;font-family:inherit;cursor:pointer;color:var(--text-muted);}
+  .seg button.on{background:var(--accent);color:#fff;}
+  .file-list{display:flex;flex-direction:column;gap:6px;}
+  .file-row{display:flex;align-items:center;gap:10px;font-size:12px;padding:7px 10px;background:var(--surface-soft);border-radius:var(--radius-sm);}
+  .file-row .k{font-size:10px;font-weight:700;color:var(--text-muted);width:64px;}
+  .file-row a{flex:1;text-decoration:none;color:var(--text);}
+  @media (max-width:900px){ .sidebar{display:none;} .main{padding:18px;} .grid2,.grid4{grid-template-columns:1fr;} }
+  @media print{ .sidebar,.tt-tools,.steps,.toolbar,.row-actions,.page-head .row{display:none!important;} .main{padding:0;} }
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login-view" class="login-wrap hidden">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">SR</div>
+      <div class="brand-text"><span class="name">Session Report</span><span class="sub">Structural Consulting · Review &amp; Learn</span></div>
+    </div>
+    <div class="fld"><label>メールアドレス</label><input type="email" id="login-email" autocomplete="email"></div>
+    <div class="fld"><label>パスワード</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" id="login-btn">ログイン</button>
+    <p id="login-err" style="font-size:11.5px;color:var(--rose);margin:10px 0 0;"></p>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app-view" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">SR</div>
+      <div class="brand-text"><span class="name">Session Report</span><span class="sub">Structural Consulting</span></div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-view="library"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>ライブラリ</div>
+      <div class="nav-item" data-view="new"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>新しいセッション</div>
+      <div class="nav-item" data-view="learning"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>学びの一覧</div>
+      <div class="nav-item" data-view="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>設定・用語集・タグ</div>
+    </nav>
+    <div class="sidebar-foot">
+      Bob（Claude）が整形・英訳・和訳を担当します。<br>
+      <a id="settings-link">API設定</a> · <a id="logout-link">ログアウト</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- LIBRARY -->
+    <section id="view-library">
+      <div class="page-head">
+        <div><h1>ライブラリ</h1><p class="desc">すべてのセッションレポートをここに保管します。クリックして開くと、整形→セルフレビュー→英訳→提出→レビュー→学び の各ステップに進めます。</p></div>
+        <div class="row"><button class="btn" id="lib-export-all">JSONバックアップ</button><button class="btn btn-primary" id="lib-new">＋ 新しいセッション</button></div>
+      </div>
+      <div class="toolbar">
+        <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="lib-search" placeholder="タイトル・クライアント・本文・ノートを検索"></div>
+        <div id="lib-status-filter" class="row"></div>
+      </div>
+      <div id="lib-list" class="rep-list"></div>
+    </section>
+
+    <!-- NEW -->
+    <section id="view-new" class="hidden">
+      <div class="page-head"><div><h1>新しいセッション</h1><p class="desc">Zoomの文字起こし（.vtt / .txt / .docx）を取り込みます。話者を割り当てたあと、Bobがフィラーを除去してテンプレートに整形します。やり取りは原型のまま、言い換えはしません。</p></div></div>
+      <div class="card">
+        <div class="grid4">
+          <div class="fld"><label>タイトル（任意）</label><input type="text" id="new-title" placeholder="例: Cさん 2回目"></div>
+          <div class="fld"><label>Client（匿名表記）</label><input type="text" id="new-client" placeholder="例: C Female / Male"></div>
+          <div class="fld"><label>セッション日</label><input type="date" id="new-date"></div>
+          <div class="fld"><label>長さ(分)</label><input type="number" id="new-length" value="60"></div>
+        </div>
+        <div class="dropzone" id="new-drop"><span id="new-drop-label">ここに .vtt / .txt / .docx をドロップ、またはクリックして選択</span></div><input type="file" id="new-file" accept=".vtt,.txt,.docx" class="hidden">
+        <p class="hint" style="margin-top:10px;">または、テキストを直接貼り付け：</p>
+        <textarea id="new-text" rows="8" placeholder="Zoomの文字起こしテキスト（話者名: 発言 の形式、または VTT の中身）"></textarea>
+        <div id="new-tpl-opts" class="hidden" style="margin-top:14px;">
+          <h3 style="font-size:13px;margin:0 0 4px;">取り込みオプション（テンプレート形式のWord）</h3>
+          <p class="hint">過去のレポートを保管用に取り込むときの設定です。</p>
+          <div class="row" style="gap:18px;">
+            <label class="chip clickable">本文の言語：</label>
+            <div class="seg" id="tpl-lang"><button data-v="ja" class="on">日本語</button><button data-v="en">English</button></div>
+            <label class="chip clickable">Notes列の扱い：</label>
+            <div class="seg" id="tpl-notes"><button data-v="own" class="on">自分のメモ</button><button data-v="robert">ロバートのコメント</button><button data-v="split">英語=ロバート / 日本語=自分</button></div>
+          </div>
+        </div>
+        <div id="new-speakers" class="hidden" style="margin-top:14px;">
+          <h3 style="font-size:13px;margin:0 0 4px;">話者の割り当て</h3>
+          <p class="hint">検出した話者名を、Consultant（自分）/ Client / 除外 に割り当ててください。</p>
+          <div class="speaker-map" id="new-speaker-map"></div>
+        </div>
+        <div class="row" style="margin-top:14px;justify-content:flex-end;">
+          <span id="new-info" class="hint" style="margin:0;flex:1;"></span>
+          <button class="btn" id="new-parse">話者を検出</button>
+          <button class="btn btn-primary" id="new-create" disabled>取り込んで保存</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORT DETAIL -->
+    <section id="view-report" class="hidden">
+      <div class="page-head">
+        <div style="flex:1;min-width:0;">
+          <div class="row" style="margin-bottom:6px;">
+            <button class="btn btn-ghost btn-sm" id="rep-back">← ライブラリ</button>
+            <span id="rep-status" class="status"></span>
+            <span id="rep-saving" class="hint" style="margin:0;"></span>
+          </div>
+          <input type="text" id="rep-title" style="font-size:18px;font-weight:700;background:transparent;border-color:transparent;padding:4px 6px;margin-left:-6px;" placeholder="タイトル">
+          <div class="row" style="margin-top:6px;gap:8px;">
+            <input type="text" id="rep-consultant" style="width:110px;" placeholder="Consultant">
+            <input type="text" id="rep-client" style="width:130px;" placeholder="Client (匿名)">
+            <input type="date" id="rep-date" style="width:150px;">
+            <input type="number" id="rep-length" style="width:80px;" placeholder="分"><span class="hint" style="margin:0;">min</span>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn btn-sm" id="rep-files-btn">ファイル</button>
+          <button class="btn btn-sm" id="rep-export-json">JSON</button>
+          <button class="btn btn-sm btn-danger" id="rep-delete">削除</button>
+        </div>
+      </div>
+
+      <div class="steps" id="rep-steps">
+        <div class="step" data-step="1"><span class="n">1</span>整形</div>
+        <div class="step" data-step="2"><span class="n">2</span>セルフレビュー</div>
+        <div class="step" data-step="3"><span class="n">3</span>英訳</div>
+        <div class="step" data-step="4"><span class="n">4</span>提出</div>
+        <div class="step" data-step="5"><span class="n">5</span>ロバートのレビュー</div>
+        <div class="step" data-step="6"><span class="n">6</span>学び</div>
+      </div>
+
+      <div id="rep-panel"></div>
+
+      <div class="tt-wrap" id="tt-wrap">
+        <div class="tt-tools">
+          <div class="seg" id="tt-lang">
+            <button data-lang="ja" class="on">日本語</button><button data-lang="both">日英</button><button data-lang="en">English</button>
+          </div>
+          <label class="chip clickable" id="tt-show-deleted"><input type="checkbox" id="tt-show-deleted-cb" style="margin:0 4px 0 0;">削除行を表示</label>
+          <label class="chip clickable"><input type="checkbox" id="tt-only-notes-cb" style="margin:0 4px 0 0;">ノートのある行だけ</label>
+          <span style="flex:1;"></span>
+          <span id="tt-count" class="hint" style="margin:0;"></span>
+        </div>
+        <div style="overflow-x:auto;">
+        <table class="tt">
+          <thead><tr><th style="width:52px;">#</th><th style="width:54px;">話者</th><th>Consultant</th><th>Client</th><th style="width:30%;">Notes</th></tr></thead>
+          <tbody id="tt-body"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEARNING -->
+    <section id="view-learning" class="hidden">
+      <div class="page-head"><div><h1>学びの一覧</h1><p class="desc">ロバートのコメントにつけたタグの傾向と、セッションごとの学びメモを横断して見返します。</p></div></div>
+      <div class="stat-tiles" id="learn-tiles"></div>
+      <div class="toolbar"><div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="learn-search" placeholder="コメント・学びメモを検索"></div></div>
+      <div id="learn-body"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="hidden">
+      <div class="page-head"><div><h1>設定・用語集・タグ</h1><p class="desc">英訳のときに固定したい訳語と、ロバートのコメントを分類するタグを管理します。</p></div></div>
+      <div class="card">
+        <h3>英訳ルール</h3>
+        <p class="hint">Bobが英訳するときのルールです。用語集と合わせてプロンプトに組み込まれます。</p>
+        <textarea id="set-rules" rows="7"></textarea>
+        <div class="row" style="justify-content:flex-end;margin-top:8px;"><button class="btn btn-sm" id="set-rules-reset">初期値に戻す</button><button class="btn btn-primary btn-sm" id="set-rules-save">保存</button></div>
+      </div>
+      <div class="card">
+        <h3>用語集（日→英）</h3>
+        <p class="hint">構造思考の用語をロバートの語彙に合わせて固定します。</p>
+        <div id="gloss-list"></div>
+        <div class="row" style="margin-top:10px;"><input type="text" id="gloss-ja" placeholder="日本語" style="flex:1;"><input type="text" id="gloss-en" placeholder="English" style="flex:1;"><button class="btn btn-sm" id="gloss-add">追加</button></div>
+      </div>
+      <div class="card">
+        <h3>タグ</h3>
+        <p class="hint">ロバートのコメントや学びメモにつけるタグ。色は accent / sage / amber / rose / gray / blue。</p>
+        <div id="tag-list" class="row"></div>
+        <div class="row" style="margin-top:10px;"><input type="text" id="tag-name" placeholder="タグ名" style="flex:1;"><select id="tag-color" style="width:120px;"><option value="accent">accent</option><option value="sage">sage</option><option value="amber">amber</option><option value="rose">rose</option><option value="gray">gray</option><option value="blue">blue</option></select><button class="btn btn-sm" id="tag-add">追加</button></div>
+      </div>
+      <div class="card">
+        <h3>Anthropic API キー</h3>
+        <p class="hint">このブラウザのlocalStorageにのみ保存されます（Supabaseには送信されません）。</p>
+        <div class="row"><input type="password" id="api-key-input2" placeholder="sk-ant-..." style="flex:1;"><button class="btn btn-sm" id="api-key-save2">保存</button></div>
+        <p class="hint" style="margin-top:8px;">モデル: <span id="model-name"></span></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>API設定</h3>
+    <div class="warn-note">Anthropic APIキーはこのブラウザのlocalStorageにのみ保存されます(Supabaseには送信されません)。共有PCでは使用後に削除してください。</div>
+    <div class="fld"><label>Anthropic API Key</label><input type="password" id="api-key-input" placeholder="sk-ant-..."></div>
+    <div class="modal-foot"><button class="btn" id="settings-cancel">閉じる</button><button class="btn btn-primary" id="settings-save">保存</button></div>
+  </div>
+</div>
+
+<!-- Generic modal -->
+<div id="gen-modal" class="modal-bg hidden"><div class="modal" id="gen-modal-box"></div></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+/* ============ CONFIG ============ */
+const SUPABASE_URL = 'https://kzzdsibwjvocbihfqtlv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_n2qWIOJzVfrzjYANDe4UzA_O4dLVmZ1';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const BUCKET = 'sc-reports';
+const KEY_NAME = 'ml_anthropic_key';   // Meeting Library と共通のキーを使う
+
+// Zoom表示名 → 自動割り当て（C=Consultant, L=Client, X=除外）
+const SPEAKER_DEFAULTS = { 'Robert Fritz Consulting':'C', 'Chica':'C', 'ちか':'C', 'Chikako Moriyama':'C', '森山千賀子':'C' };
+
+const DEFAULT_RULES = `- 日本語で主語が省略されている場合、原則として Consultant の発言は "you"（クライアントに向けた語り）、Client の発言は "I" を主語として補う。文脈から明らかに別の主語（he/she/they/we）の場合はそれに従う。
+- 意味を足したり整理したりしない。曖昧さ・言いよどみ・繰り返し・未完の文はそのまま英語にする（クライアントの言葉を綺麗にしすぎない）。
+- 質問は質問のまま、断定は断定のまま。Consultant が質問していない箇所を質問に変えない。
+- 敬語・丁寧語のニュアンスは訳さなくてよい。自然な会話体の英語にする。
+- 用語集にある語は必ず指定の英語を使う。
+- Notes（Consultant 自身のメモ）は、ロバートが読んで意味が通る簡潔な英語にする。`;
+
+const STATUS_LABEL = { draft:'整形中', self_review:'セルフレビュー', translated:'英訳済み', submitted:'提出済み', reviewed:'レビュー受領', learned:'学び整理済み' };
+const STATUS_ORDER = ['draft','self_review','translated','submitted','reviewed','learned'];
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============ STATE ============ */
+let reports = [];        // list rows (light)
+let glossary = [];
+let tags = [];
+let cur = null;          // current report (full)
+let curStep = 1;
+let ttLang = 'ja';
+let libFilter = 'all';
+let saveTimer = null;
+let dirty = false;
+
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+function toast(msg, isErr=false){ const t=$('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); setTimeout(()=>t.className='toast', isErr?4500:2400); }
+function esc(s){ return (s??'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`; }
+function fmtDateEn(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}); }
+function today(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function download(name, blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000); }
+function liveRows(r){ return (r||cur).rows.filter(x=>!x.deleted); }
+function numOf(row){ let n=0; for(const r of cur.rows){ if(!r.deleted) n++; if(r===row) return r.deleted?'—':n; } return ''; }
+function tagObj(name){ return tags.find(t=>t.name===name); }
+function tagChip(name, extra=''){ const t=tagObj(name); return `<span class="chip c-${t?.color||'gray'} ${extra}">${esc(name)}</span>`; }
+
+/* ============ AUTH ============ */
+async function init(){
+  const { data:{ session } } = await supabase.auth.getSession();
+  if(session) showApp(); else showLogin();
+  supabase.auth.onAuthStateChange((_e,s)=>{ if(s && $('app-view').classList.contains('hidden')) showApp(); });
+}
+function showLogin(){ $('login-view').classList.remove('hidden'); $('app-view').classList.add('hidden'); }
+async function showApp(){ $('login-view').classList.add('hidden'); $('app-view').classList.remove('hidden'); await loadAll(); route(); }
+$('login-btn').onclick = async ()=>{
+  $('login-err').textContent='';
+  const { error } = await supabase.auth.signInWithPassword({ email:$('login-email').value.trim(), password:$('login-pass').value });
+  if(error){ $('login-err').textContent='ログインできませんでした: '+error.message; return; }
+  showApp();
+};
+$('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') $('login-btn').click(); });
+$('logout-link').onclick = async ()=>{ await supabase.auth.signOut(); location.reload(); };
+
+/* ============ SETTINGS (API key) ============ */
+$('settings-link').onclick = ()=>{ $('api-key-input').value=localStorage.getItem(KEY_NAME)||''; $('settings-modal').classList.remove('hidden'); };
+$('settings-cancel').onclick = ()=> $('settings-modal').classList.add('hidden');
+$('settings-save').onclick = ()=>{ const v=$('api-key-input').value.trim(); if(v) localStorage.setItem(KEY_NAME,v); else localStorage.removeItem(KEY_NAME); $('settings-modal').classList.add('hidden'); toast('保存しました'); };
+$('api-key-save2').onclick = ()=>{ const v=$('api-key-input2').value.trim(); if(v) localStorage.setItem(KEY_NAME,v); else localStorage.removeItem(KEY_NAME); toast('保存しました'); };
+function requireKey(){ const k=localStorage.getItem(KEY_NAME); if(!k){ toast('先に「API設定」からAnthropic APIキーを保存してください', true); $('settings-link').click(); } return k; }
+function getRules(){ return localStorage.getItem('sr_rules') || DEFAULT_RULES; }
+
+/* ============ CLAUDE API ============ */
+async function callClaude(system, user, maxTokens=8000){
+  const key = requireKey(); if(!key) throw new Error('APIキー未設定');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+    body: JSON.stringify({ model:CLAUDE_MODEL, max_tokens:maxTokens, system, messages:[{role:'user',content:user}] }),
+  });
+  if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error('Claude API: '+(e.error?.message||res.status)); }
+  const data = await res.json();
+  return data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+}
+function parseJsonLoose(txt){
+  let s = txt.trim();
+  const m = s.match(/```(?:json)?\s*([\s\S]*?)```/); if(m) s = m[1].trim();
+  const i = s.indexOf('['), j = s.lastIndexOf(']');
+  if(i>=0 && j>i) s = s.slice(i, j+1);
+  return JSON.parse(s);
+}
+// rows を batch に分けて Claude に処理させる汎用ヘルパー
+async function runBatches(items, batchSize, fn, onProgress){
+  const out = [];
+  for(let i=0;i<items.length;i+=batchSize){
+    const chunk = items.slice(i, i+batchSize);
+    onProgress?.(Math.min(i+batchSize, items.length), items.length);
+    const res = await fn(chunk, i);
+    out.push(...res);
+  }
+  return out;
+}
+function setProgress(el, done, total, label){
+  if(!el) return;
+  el.innerHTML = done>=0 ? `<span class="progress"><span class="spin"></span>${esc(label)} ${done}/${total}</span>` : '';
+}
+
+/* ============ TRANSCRIPT PARSERS ============ */
+function parseTranscriptText(text){
+  const t = text.replace(/\r/g,'');
+  const lines = t.split('\n');
+  const utts = [];
+  if(/^WEBVTT/m.test(t) || /-->/.test(t)){
+    // VTT / SRT: cue blocks
+    let i=0;
+    while(i<lines.length){
+      const line = lines[i];
+      if(/-->/.test(line)){
+        i++; let body=[];
+        while(i<lines.length && lines[i].trim()!==''){ body.push(lines[i]); i++; }
+        const s = body.join(' ').trim();
+        const m = s.match(/^([^:：]{1,40})[:：]\s*(.*)$/s);
+        if(m) utts.push({ speaker:m[1].trim(), text:m[2].trim() });
+        else if(s) utts.push({ speaker:'', text:s });
+      } else i++;
+    }
+  } else {
+    // Zoom .txt: "[Name] 00:00:00" + text, or "Name: text", or "00:00:00 Name: text"
+    let curSp = '', buf=[];
+    const flush=()=>{ const s=buf.join(' ').trim(); if(s) utts.push({speaker:curSp, text:s}); buf=[]; };
+    for(const raw of lines){
+      const line = raw.trim(); if(!line) continue;
+      let m;
+      if((m = line.match(/^\[(.+?)\]\s*\d{1,2}:\d{2}(:\d{2})?\s*$/))){ flush(); curSp=m[1].trim(); continue; }
+      if((m = line.match(/^(?:\d{1,2}:\d{2}(?::\d{2})?\s+)?([^:：]{1,40})[:：]\s*(.+)$/)) && !/^\d/.test(m[1])){ flush(); curSp=m[1].trim(); buf=[m[2]]; flush(); continue; }
+      buf.push(line);
+    }
+    flush();
+  }
+  // merge consecutive same speaker
+  const merged=[];
+  for(const u of utts){
+    const last = merged[merged.length-1];
+    if(last && last.speaker===u.speaker) last.text += (/[\x21-\x7E]$/.test(last.text)?' ':'') + u.text;
+    else merged.push({...u});
+  }
+  return merged;
+}
+
+// DOCX → { paras:[{type:'p',text}|{type:'table',rows:[[cellText,...]]}] } 本文順
+async function parseDocx(arrayBuffer){
+  const zip = await JSZip.loadAsync(arrayBuffer);
+  const xml = await zip.file('word/document.xml').async('string');
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const body = doc.getElementsByTagNameNS(W,'body')[0];
+  const pText = p => { let s=''; const walk=n=>{ for(const c of n.childNodes){ if(c.nodeType!==1) continue; const ln=c.localName; if(ln==='t') s+=c.textContent; else if(ln==='tab') s+='\t'; else if(ln==='br'||ln==='cr') s+='\n'; else if(ln!=='rPr'&&ln!=='pPr') walk(c);} }; walk(p); return s; };
+  const out=[];
+  for(const el of body.childNodes){
+    if(el.nodeType!==1) continue;
+    if(el.localName==='p'){ out.push({type:'p', text:pText(el)}); }
+    else if(el.localName==='tbl'){
+      const rows=[];
+      for(const tr of el.getElementsByTagNameNS(W,'tr')){
+        if(tr.parentNode!==el) continue;
+        const cells=[];
+        for(const tc of tr.childNodes){ if(tc.nodeType!==1||tc.localName!=='tc') continue;
+          const ps=[]; for(const p of tc.getElementsByTagNameNS(W,'p')) ps.push(pText(p)); cells.push(ps.join('\n').trim()); }
+        rows.push(cells);
+      }
+      out.push({type:'table', rows});
+    }
+  }
+  return out;
+}
+// テンプレート形式のWord（#/Consultant/Client/Notes）を rows に変換。header情報も拾う
+function templateFromDocx(blocks){
+  const tbl = blocks.find(b=>b.type==='table' && b.rows.length>1 && b.rows[0].length>=4 && /#/.test(b.rows[0][0]));
+  if(!tbl) return null;
+  const rows=[];
+  for(const r of tbl.rows.slice(1)){
+    const [n,c,l,note] = r;
+    const speaker = (c||'').trim() ? 'C' : 'L';
+    rows.push({ num:parseInt(n)||rows.length+1, speaker, text:((speaker==='C'?c:l)||'').trim(), note:(note||'').trim() });
+  }
+  const tblIdx = blocks.indexOf(tbl);
+  const before = blocks.slice(0,tblIdx).filter(b=>b.type==='p').map(b=>b.text.trim()).filter(Boolean);
+  const after  = blocks.slice(tblIdx+1).filter(b=>b.type==='p').map(b=>b.text.trim()).filter(Boolean);
+  const head = {};
+  for(const p of before){
+    const m1=p.match(/Consultant\s*[:：]\s*(.+?)(?:\s{2,}|\t|$)/); if(m1) head.consultant=m1[1].trim();
+    const m2=p.match(/Client\s*[:：]\s*(.+?)(?:\s{2,}|\t|$)/); if(m2) head.client=m2[1].trim();
+    const m3=p.match(/Date of session\s*[:：]\s*(.+?)(?:\s{2,}|\t|$)/); if(m3) head.date=m3[1].trim();
+    const m4=p.match(/Length of session\s*[:：]\s*(\d+)/); if(m4) head.length=parseInt(m4[1]);
+  }
+  const isHeaderLine = p => /^Structural Consulting Session Report$/i.test(p) || /Consultant\s*[:：]/.test(p);
+  return { rows, head, extraBefore: before.filter(p=>!isHeaderLine(p)), extraAfter: after };
+}
+
+/* ============ DATA ============ */
+async function loadAll(){
+  const [r,g,t] = await Promise.all([
+    supabase.from('sc_reports').select('id,title,client_label,session_date,length_min,status,updated_at,learning_tags').order('session_date',{ascending:false}).order('created_at',{ascending:false}),
+    supabase.from('sc_glossary').select('*').order('sort_order').order('created_at'),
+    supabase.from('sc_tags').select('*').order('sort_order').order('created_at'),
+  ]);
+  if(r.error) toast('読み込みエラー: '+r.error.message, true);
+  reports = r.data||[]; glossary = g.data||[]; tags = t.data||[];
+  $('model-name').textContent = CLAUDE_MODEL;
+}
+
+/* ============ ROUTING ============ */
+const VIEWS = ['library','new','report','learning','settings'];
+function showView(v){
+  VIEWS.forEach(x=>$('view-'+x).classList.toggle('hidden', x!==v));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===v || (v==='report'&&n.dataset.view==='library')));
+  if(v==='library') renderLibrary();
+  if(v==='learning') renderLearning();
+  if(v==='settings') renderSettings();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.nav-item').forEach(n=>n.onclick=()=>{ if(n.dataset.view==='library') location.hash=''; else location.hash='#'+n.dataset.view; });
+async function route(){
+  const h = location.hash.replace('#','');
+  if(h.startsWith('r/')){ await openReport(h.slice(2)); return; }
+  if(VIEWS.includes(h) && h!=='report'){ showView(h); return; }
+  showView('library');
+}
+window.addEventListener('hashchange', route);
+
+/* ============ LIBRARY ============ */
+$('lib-new').onclick = ()=> location.hash='#new';
+$('lib-search').oninput = ()=> renderLibrary();
+function renderLibrary(){
+  const f = $('lib-status-filter');
+  f.innerHTML = ['all',...STATUS_ORDER].map(s=>`<span class="chip clickable ${libFilter===s?'sel':''}" data-s="${s}">${s==='all'?'すべて':STATUS_LABEL[s]}</span>`).join('');
+  f.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ libFilter=c.dataset.s; renderLibrary(); });
+  const q = $('lib-search').value.trim().toLowerCase();
+  let list = reports.filter(r=> libFilter==='all' || r.status===libFilter);
+  if(q) list = list.filter(r=> [r.title, r.client_label, ...(r.learning_tags||[])].join(' ').toLowerCase().includes(q) || (r._fulltext||'').includes(q));
+  const el = $('lib-list');
+  if(!list.length){ el.innerHTML = `<div class="empty">${q?'該当するレポートがありません（本文検索は開いたことのあるレポートのみ対象です）':'まだレポートがありません。「新しいセッション」から取り込んでください。'}</div>`; return; }
+  el.innerHTML = list.map(r=>`<div class="rep-item" data-id="${r.id}">
+    <span class="date">${fmtDate(r.session_date)}</span>
+    <span class="ttl">${esc(r.title||'(無題)')}</span>
+    <span class="meta">${esc(r.client_label||'')}${r.length_min?' · '+r.length_min+'min':''}</span>
+    ${(r.learning_tags||[]).slice(0,3).map(t=>tagChip(t)).join('')}
+    <span class="status st-${r.status}">${STATUS_LABEL[r.status]||r.status}</span>
+  </div>`).join('');
+  el.querySelectorAll('.rep-item').forEach(i=>i.onclick=()=>location.hash='#r/'+i.dataset.id);
+}
+$('lib-export-all').onclick = async ()=>{
+  const { data, error } = await supabase.from('sc_reports').select('*');
+  if(error) return toast(error.message, true);
+  download(`session-reports-backup-${today()}.json`, new Blob([JSON.stringify({exported_at:new Date().toISOString(), glossary, tags, reports:data},null,2)],{type:'application/json'}));
+};
+
+/* ============ NEW SESSION ============ */
+let newUtts = null, newFile = null, newDocxTemplate = null;
+$('new-date').value = today();
+$('new-drop').onclick = ()=> $('new-file').click();
+$('new-drop').ondragover = e=>{ e.preventDefault(); $('new-drop').classList.add('over'); };
+$('new-drop').ondragleave = ()=> $('new-drop').classList.remove('over');
+$('new-drop').ondrop = e=>{ e.preventDefault(); $('new-drop').classList.remove('over'); if(e.dataTransfer.files[0]) handleNewFile(e.dataTransfer.files[0]); };
+$('new-file').onchange = e=>{ if(e.target.files[0]) handleNewFile(e.target.files[0]); };
+async function handleNewFile(f){
+  newFile = f; newDocxTemplate = null;
+  $('new-drop-label').textContent = '📄 '+f.name;
+  if(/\.docx$/i.test(f.name)){
+    const blocks = await parseDocx(await f.arrayBuffer());
+    const tpl = templateFromDocx(blocks);
+    if(tpl){
+      newDocxTemplate = tpl;
+      if(tpl.head.client) $('new-client').value = tpl.head.client;
+      if(tpl.head.length) $('new-length').value = tpl.head.length;
+      if(tpl.head.date){ const d=new Date(tpl.head.date); if(!isNaN(d)) $('new-date').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+      if(tpl.head.consultant && !/\t/.test(tpl.head.consultant)) $('new-title').value = $('new-title').value || '';
+      $('new-text').value = '';
+      $('new-info').textContent = `テンプレート形式のWordを検出（${tpl.rows.length}行）。話者は列から判定済みです。`;
+      $('new-speakers').classList.add('hidden'); newUtts=null;
+      $('new-tpl-opts').classList.remove('hidden');
+      const bodyEn = tpl.rows.filter(r=>r.text && !/[\u3040-\u30ff\u4e00-\u9fff]/.test(r.text)).length > tpl.rows.length/2;
+      $('tpl-lang').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===(bodyEn?'en':'ja')));
+      $('new-create').disabled = false;
+      return;
+    }
+    $('new-text').value = blocks.filter(b=>b.type==='p').map(b=>b.text).join('\n');
+  } else {
+    $('new-text').value = await f.text();
+  }
+  $('new-parse').click();
+}
+$('new-parse').onclick = ()=>{
+  newDocxTemplate = null; $('new-tpl-opts').classList.add('hidden');
+  const txt = $('new-text').value; if(!txt.trim()) return toast('テキストがありません', true);
+  newUtts = parseTranscriptText(txt);
+  const names = [...new Set(newUtts.map(u=>u.speaker))];
+  const map = $('new-speaker-map');
+  map.innerHTML = names.map((n,i)=>{
+    const cnt = newUtts.filter(u=>u.speaker===n).length;
+    const def = SPEAKER_DEFAULTS[n] || (names.length===2 && i===1 && SPEAKER_DEFAULTS[names[0]] ? 'L' : (names.length===2 && i===0 ? 'C' : 'L'));
+    return `<div>${esc(n||'(話者名なし)')} <span class="hint" style="margin:0;">${cnt}発言</span></div>
+      <div class="seg" data-name="${esc(n)}"><button data-v="C" class="${def==='C'?'on':''}">Consultant</button><button data-v="L" class="${def==='L'?'on':''}">Client</button><button data-v="X" class="${def==='X'?'on':''}">除外</button></div>`;
+  }).join('');
+  map.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.onclick=()=>{ s.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
+  $('new-speakers').classList.remove('hidden');
+  $('new-info').textContent = `${newUtts.length}発言を検出`;
+  $('new-create').disabled = false;
+};
+['tpl-lang','tpl-notes'].forEach(id=>$(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{ $(id).querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
+$('new-create').onclick = async ()=>{
+  let rows = [], speaker_map = {};
+  if(newDocxTemplate){
+    const lang = $('tpl-lang').querySelector('button.on').dataset.v, notesMode = $('tpl-notes').querySelector('button.on').dataset.v;
+    const isJa = t => /[\u3040-\u30ff\u4e00-\u9fff]/.test(t||'');
+    rows = newDocxTemplate.rows.map((r,i)=>{
+      const row = { id:uid(), seq:i+1, speaker:r.speaker, ja:lang==='ja'?r.text:'', en:lang==='en'?r.text:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false };
+      const n = r.note||'';
+      if(!n) return row;
+      if(notesMode==='own'){ if(isJa(n)) row.note_ja=n; else row.note_en=n; }
+      else if(notesMode==='robert'){ if(isJa(n)) row.robert_ja=n; else row.robert_en=n; }
+      else { // split: 段落ごとに英語=ロバート / 日本語=自分
+        const ps = n.split('\n').map(x=>x.trim()).filter(Boolean);
+        row.robert_en = ps.filter(x=>!isJa(x)).join('\n'); row.note_ja = ps.filter(isJa).join('\n');
+      }
+      return row;
+    });
+  } else {
+    if(!newUtts) return toast('先に「話者を検出」してください', true);
+    document.querySelectorAll('#new-speaker-map .seg').forEach(s=>{ speaker_map[s.dataset.name] = s.querySelector('button.on')?.dataset.v || 'L'; });
+    let seq=0;
+    for(const u of newUtts){
+      const sp = speaker_map[u.speaker]||'L'; if(sp==='X') continue;
+      const last = rows[rows.length-1];
+      if(last && last.speaker===sp){ last.ja += ' '+u.text; continue; }
+      rows.push({ id:uid(), seq:++seq, speaker:sp, ja:u.text, en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false });
+    }
+    rows.forEach((r,i)=>r.seq=i+1);
+  }
+  if(!rows.length) return toast('取り込める発言がありません', true);
+  const payload = {
+    title: $('new-title').value.trim() || `${$('new-client').value.trim()||'Session'} ${fmtDate($('new-date').value)}`,
+    client_label: $('new-client').value.trim(), session_date: $('new-date').value||null, length_min: parseInt($('new-length').value)||null,
+    raw_transcript: $('new-text').value || null, speaker_map, rows,
+    status: newDocxTemplate ? (rows.some(r=>r.robert_en||r.robert_ja) ? 'reviewed' : 'self_review') : 'draft',
+  };
+  if(newDocxTemplate){
+    const isJa = t => (t.match(/[\u3040-\u30ff\u4e00-\u9fff]/g)||[]).length > t.length*0.2;
+    const ex = [...newDocxTemplate.extraBefore, ...newDocxTemplate.extraAfter].filter(p=>p.length>20);
+    payload.robert_overall_en = ex.filter(p=>!isJa(p)).join('\n\n') || null; payload.robert_overall_ja = ex.filter(isJa).join('\n\n') || null;
+  }
+  const { data, error } = await supabase.from('sc_reports').insert(payload).select().single();
+  if(error) return toast('保存エラー: '+error.message, true);
+  if(newFile){
+    const path = `${data.id}/source_${Date.now()}_${newFile.name}`;
+    const { error:sErr } = await supabase.storage.from(BUCKET).upload(path, newFile);
+    if(!sErr) await supabase.from('sc_reports').update({ files:[{kind:'source', path, name:newFile.name, at:new Date().toISOString()}] }).eq('id', data.id);
+  }
+  toast('取り込みました');
+  newUtts=null; newFile=null; newDocxTemplate=null; $('new-text').value=''; $('new-title').value=''; $('new-client').value=''; $('new-drop-label').textContent='ここに .vtt / .txt / .docx をドロップ、またはクリックして選択'; $('new-file').value=''; $('new-speakers').classList.add('hidden'); $('new-tpl-opts').classList.add('hidden'); $('new-info').textContent=''; $('new-create').disabled=true;
+  await loadAll();
+  location.hash = '#r/'+data.id;
+};
+
+/* ============ REPORT: load / save ============ */
+async function openReport(id){
+  const { data, error } = await supabase.from('sc_reports').select('*').eq('id', id).single();
+  if(error||!data){ toast('レポートが見つかりません', true); location.hash=''; return; }
+  cur = data; cur.rows = cur.rows||[]; cur.learning = cur.learning||{}; cur.files = cur.files||[]; cur.learning_tags = cur.learning_tags||[];
+  const li = reports.find(r=>r.id===id); if(li) li._fulltext = cur.rows.map(r=>[r.ja,r.en,r.note_ja,r.robert_ja,r.robert_en].join(' ')).join(' ').toLowerCase();
+  curStep = { draft:1, self_review:2, translated:3, submitted:5, reviewed:6, learned:6 }[cur.status] || 1;
+  ttLang = cur.status==='translated' ? 'both' : (STATUS_ORDER.indexOf(cur.status)>=3 ? 'both' : 'ja');
+  $('rep-title').value = cur.title||''; $('rep-consultant').value = cur.consultant||'Chica'; $('rep-client').value = cur.client_label||''; $('rep-date').value = cur.session_date||''; $('rep-length').value = cur.length_min||'';
+  showView('report'); renderReport();
+}
+function markDirty(){ dirty=true; $('rep-saving').textContent='未保存…'; clearTimeout(saveTimer); saveTimer=setTimeout(saveCur, 1200); }
+async function saveCur(fields){
+  if(!cur) return;
+  const payload = fields || { title:cur.title, consultant:cur.consultant, client_label:cur.client_label, session_date:cur.session_date||null, length_min:cur.length_min||null, status:cur.status, rows:cur.rows, robert_overall_en:cur.robert_overall_en, robert_overall_ja:cur.robert_overall_ja, learning:cur.learning, learning_tags:cur.learning_tags, submitted_snapshot:cur.submitted_snapshot, submitted_at:cur.submitted_at, files:cur.files };
+  $('rep-saving').textContent='保存中…';
+  const { error } = await supabase.from('sc_reports').update(payload).eq('id', cur.id);
+  if(error){ $('rep-saving').textContent='保存失敗'; toast('保存エラー: '+error.message, true); return false; }
+  dirty=false; $('rep-saving').textContent='保存済み'; setTimeout(()=>{ if(!dirty) $('rep-saving').textContent=''; }, 1500);
+  const li = reports.find(r=>r.id===cur.id); if(li){ Object.assign(li, { title:cur.title, client_label:cur.client_label, session_date:cur.session_date, length_min:cur.length_min, status:cur.status, learning_tags:cur.learning_tags }); }
+  return true;
+}
+window.addEventListener('beforeunload', e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+['rep-title','rep-consultant','rep-client','rep-date','rep-length'].forEach(id=>$(id).oninput=()=>{ if(!cur) return;
+  cur.title=$('rep-title').value; cur.consultant=$('rep-consultant').value; cur.client_label=$('rep-client').value; cur.session_date=$('rep-date').value; cur.length_min=parseInt($('rep-length').value)||null; markDirty(); });
+$('rep-back').onclick = async ()=>{ if(dirty) await saveCur(); location.hash=''; };
+$('rep-delete').onclick = async ()=>{
+  if(!confirm('このレポートを削除しますか？（元に戻せません）')) return;
+  const { error } = await supabase.from('sc_reports').delete().eq('id', cur.id);
+  if(error) return toast(error.message, true);
+  const paths = (cur.files||[]).map(f=>f.path); if(paths.length) await supabase.storage.from(BUCKET).remove(paths);
+  cur=null; await loadAll(); location.hash=''; toast('削除しました');
+};
+$('rep-export-json').onclick = ()=> download(`${(cur.title||'report').replace(/[\\/:*?"<>|]/g,'_')}.json`, new Blob([JSON.stringify(cur,null,2)],{type:'application/json'}));
+async function setStatus(s){ cur.status=s; $('rep-status').className='status st-'+s; $('rep-status').textContent=STATUS_LABEL[s]; await saveCur(); renderSteps(); }
+
+/* ============ REPORT: render ============ */
+function renderReport(){
+  $('rep-status').className='status st-'+cur.status; $('rep-status').textContent=STATUS_LABEL[cur.status];
+  renderSteps(); renderPanel(); renderTable();
+}
+function renderSteps(){
+  const idx = STATUS_ORDER.indexOf(cur.status);
+  document.querySelectorAll('#rep-steps .step').forEach(s=>{
+    const n=parseInt(s.dataset.step);
+    s.classList.toggle('active', n===curStep);
+    s.classList.toggle('done', n<=idx);   // draft=0 → none; self_review=1 → step1 done ...
+    s.onclick=()=>{ curStep=n; renderSteps(); renderPanel(); };
+  });
+  $('tt-lang').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.lang===ttLang));
+}
+$('tt-lang').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ttLang=b.dataset.lang; renderSteps(); renderTable(); });
+$('tt-show-deleted-cb').onchange = renderTable;
+$('tt-only-notes-cb').onchange = renderTable;
+
+function renderTable(){
+  const showDel = $('tt-show-deleted-cb').checked, onlyNotes = $('tt-only-notes-cb').checked;
+  const showJa = ttLang!=='en', showEn = ttLang!=='ja';
+  const body = $('tt-body');
+  const html = [];
+  let n=0;
+  for(const r of cur.rows){
+    if(!r.deleted) n++;
+    if(r.deleted && !showDel) continue;
+    if(onlyNotes && !(r.note_ja||r.note_en||r.robert_en||r.robert_ja)) continue;
+    const num = r.deleted ? '—' : n;
+    const textCell = `${showJa?`<div class="cell-text ja" contenteditable="true" data-id="${r.id}" data-f="ja">${esc(r.ja)}</div>`:''}
+      ${showEn?`<div class="cell-text en" contenteditable="true" data-id="${r.id}" data-f="en" ${showJa?'':''}>${esc(r.en)}</div>`:''}
+      <div class="row-actions">
+        <button class="btn btn-xs" data-act="toggle" data-id="${r.id}">${r.deleted?'復元':'削除'}</button>
+        <button class="btn btn-xs" data-act="merge" data-id="${r.id}" title="上の行と結合">↑結合</button>
+        <button class="btn btn-xs" data-act="insert" data-id="${r.id}" title="下に行を挿入">＋下に</button>
+        <button class="btn btn-xs" data-act="split" data-id="${r.id}" title="カーソル位置で分割（日本語欄）">分割</button>
+      </div>`;
+    const ownNote = `${showJa?`<div class="cell-text note-own ${r.note_ja?'':'is-empty'}" contenteditable="true" data-id="${r.id}" data-f="note_ja" data-ph="メモ…">${esc(r.note_ja)}</div>`:''}
+      ${showEn?`<div class="cell-text note-own en ${r.note_en?'':'is-empty'}" contenteditable="true" data-id="${r.id}" data-f="note_en" data-ph="note (EN)…">${esc(r.note_en)}</div>`:''}`;
+    const robert = (r.robert_en||r.robert_ja) ? `<div class="note-robert"><span class="who">ROBERT</span>
+        ${showEn||!r.robert_ja?`<div class="cell-text en" contenteditable="true" data-id="${r.id}" data-f="robert_en">${esc(r.robert_en)}</div>`:''}
+        ${showJa&&(r.robert_ja||curStep>=5)?`<div class="cell-text ja ${r.robert_en&&(showEn||!r.robert_ja)?'':''}" contenteditable="true" data-id="${r.id}" data-f="robert_ja" data-ph="和訳…" style="${r.robert_en&&showEn?'margin-top:4px;padding-top:4px;border-top:1px dashed rgba(189,107,92,.3);':''}">${esc(r.robert_ja)}</div>`:''}
+        <div class="tagrow">${(r.tags||[]).map(t=>tagChip(t,'clickable')+'').join('')}<span class="tag-add" data-id="${r.id}">＋タグ</span><span class="learn-mark ${r.learn?'on':''}" data-id="${r.id}" title="学びとして印をつける">★</span><span class="tag-add" data-swap="${r.id}" title="自分のメモとロバートのコメントを入れ替える">⇄</span></div>
+      </div>` : (curStep>=5 ? `<div class="tagrow"><span class="tag-add" data-id="${r.id}" data-rob="1" style="color:var(--rose);">＋ロバートのコメント</span>${(r.note_ja||r.note_en)?`<span class="tag-add" data-swap="${r.id}" title="このメモをロバートのコメントにする">→Robert</span>`:''}</div>`:'');
+    html.push(`<tr class="${r.deleted?'deleted':''}" data-id="${r.id}">
+      <td class="num">${num}<span class="seq">(${r.seq})</span></td>
+      <td class="spk"><span class="spk-btn spk-${r.speaker}" data-id="${r.id}" title="クリックで話者を入れ替え">${r.speaker==='C'?'Cons.':'Client'}</span></td>
+      <td>${r.speaker==='C'?textCell:''}</td>
+      <td>${r.speaker==='L'?textCell:''}</td>
+      <td>${ownNote}${robert}</td>
+    </tr>`);
+  }
+  body.innerHTML = html.join('') || `<tr><td colspan="5" class="empty">行がありません</td></tr>`;
+  $('tt-count').textContent = `${liveRows().length}行（削除 ${cur.rows.filter(r=>r.deleted).length}）`;
+  // bind
+  body.querySelectorAll('.cell-text').forEach(el=>{
+    el.addEventListener('input', ()=>{ const r=cur.rows.find(x=>x.id===el.dataset.id); r[el.dataset.f]=el.innerText.replace(/\n$/,''); el.classList.toggle('is-empty', !r[el.dataset.f] && el.classList.contains('note-own')); markDirty(); });
+    el.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey && el.dataset.f!=='ja' && el.dataset.f!=='en'){ /* allow */ } });
+  });
+  body.querySelectorAll('.spk-btn').forEach(b=>b.onclick=()=>{ const r=cur.rows.find(x=>x.id===b.dataset.id); r.speaker = r.speaker==='C'?'L':'C'; markDirty(); renderTable(); });
+  body.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>rowAction(b.dataset.act, b.dataset.id));
+  body.querySelectorAll('.tag-add').forEach(b=>b.onclick=e=>{ if(b.dataset.rob){ const r=cur.rows.find(x=>x.id===b.dataset.id); r.robert_en=' '; markDirty(); renderTable(); setTimeout(()=>body.querySelector(`.cell-text[data-id="${r.id}"][data-f="robert_en"]`)?.focus(),0); } else openTagPopover(e, b.dataset.id); });
+  body.querySelectorAll('.tagrow .chip').forEach(c=>c.onclick=()=>{ const r=cur.rows.find(x=>x.id===c.closest('.tagrow').querySelector('.tag-add').dataset.id); r.tags=r.tags.filter(t=>t!==c.textContent); markDirty(); renderTable(); });
+  body.querySelectorAll('[data-swap]').forEach(b=>b.onclick=()=>{ const r=cur.rows.find(x=>x.id===b.dataset.swap); [r.note_ja,r.robert_ja]=[r.robert_ja,r.note_ja]; [r.note_en,r.robert_en]=[r.robert_en,r.note_en]; markDirty(); renderTable(); });
+  body.querySelectorAll('.learn-mark').forEach(m=>m.onclick=()=>{ const r=cur.rows.find(x=>x.id===m.dataset.id); r.learn=!r.learn; markDirty(); renderTable(); });
+}
+function rowAction(act, id){
+  const i = cur.rows.findIndex(x=>x.id===id); const r = cur.rows[i];
+  if(act==='toggle'){ r.deleted=!r.deleted; }
+  if(act==='merge'){ let j=i-1; while(j>=0 && cur.rows[j].deleted) j--; if(j<0) return toast('上に行がありません', true); const p=cur.rows[j];
+    if(p.speaker!==r.speaker && !confirm('話者が違います。それでも結合しますか？')) return;
+    p.ja=(p.ja+' '+r.ja).trim(); p.en=(p.en+' '+r.en).trim(); p.note_ja=[p.note_ja,r.note_ja].filter(Boolean).join('\n'); p.note_en=[p.note_en,r.note_en].filter(Boolean).join('\n'); p.robert_en=[p.robert_en,r.robert_en].filter(Boolean).join('\n'); p.robert_ja=[p.robert_ja,r.robert_ja].filter(Boolean).join('\n'); p.tags=[...new Set([...(p.tags||[]),...(r.tags||[])])]; cur.rows.splice(i,1); }
+  if(act==='insert'){ cur.rows.splice(i+1,0,{ id:uid(), seq:r.seq, speaker:r.speaker==='C'?'L':'C', ja:'', en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false, inserted:true }); }
+  if(act==='split'){
+    const el = document.querySelector(`.cell-text[data-id="${id}"][data-f="ja"]`); const sel=window.getSelection();
+    let pos = (el && sel && sel.anchorNode && el.contains(sel.anchorNode)) ? getCaretPos(el) : -1;
+    if(pos<=0 || pos>=r.ja.length){ const s=prompt('分割位置の直後の文字列（先頭数文字）を入力してください'); if(!s) return; pos=r.ja.indexOf(s); if(pos<=0) return toast('見つかりません', true); }
+    const rest = r.ja.slice(pos).trim(); r.ja = r.ja.slice(0,pos).trim();
+    cur.rows.splice(i+1,0,{ id:uid(), seq:r.seq, speaker:r.speaker, ja:rest, en:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false, inserted:true });
+  }
+  markDirty(); renderTable();
+}
+function getCaretPos(el){ const sel=window.getSelection(); const range=sel.getRangeAt(0).cloneRange(); range.selectNodeContents(el); range.setEnd(sel.anchorNode, sel.anchorOffset); return range.toString().length; }
+function openTagPopover(e, rowId){
+  document.querySelectorAll('.tag-popover').forEach(p=>p.remove());
+  const r = cur.rows.find(x=>x.id===rowId);
+  const pop = document.createElement('div'); pop.className='tag-popover';
+  pop.innerHTML = tags.map(t=>`<span class="chip clickable c-${t.color} ${r.tags.includes(t.name)?'on':''}" data-n="${esc(t.name)}">${esc(t.name)}</span>`).join('') + `<input type="text" placeholder="新しいタグ + Enter" style="width:100%;margin-top:6px;padding:5px 8px;font-size:11px;">`;
+  document.body.appendChild(pop);
+  const rect = e.target.getBoundingClientRect(); pop.style.left=Math.min(rect.left, window.innerWidth-340)+'px'; pop.style.top=(rect.bottom+window.scrollY+4)+'px';
+  pop.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ const n=c.dataset.n; if(r.tags.includes(n)) r.tags=r.tags.filter(x=>x!==n); else r.tags.push(n); markDirty(); pop.remove(); renderTable(); });
+  pop.querySelector('input').onkeydown = async ev=>{ if(ev.key==='Enter'){ const n=ev.target.value.trim(); if(!n) return; await addTag(n,'accent'); r.tags.push(n); markDirty(); pop.remove(); renderTable(); } };
+  setTimeout(()=>document.addEventListener('click', function h(ev){ if(!pop.contains(ev.target)){ pop.remove(); document.removeEventListener('click',h);} }),0);
+}
+
+/* ============ STEP PANELS ============ */
+function renderPanel(){
+  const p = $('rep-panel');
+  const live = liveRows();
+  const enDone = live.filter(r=>r.en).length, robDone = live.filter(r=>r.robert_en).length, jaDone = live.filter(r=>r.robert_en && r.robert_ja).length;
+  const filesHtml = kind => cur.files.filter(f=>f.kind===kind).map(f=>`<span class="chip">${esc(f.name)}</span>`).join('');
+  let h='';
+  if(curStep===1) h = `<div class="card"><h3>① 整形 — フィラーを除去してテンプレートに整える</h3>
+    <p class="hint">「えー」「あの」「なんか」などのフィラーと言い直しを取り除きます。言い換えや要約はしません。整形後も表の中で自由に編集できます（話者の入れ替え・行の削除・結合・分割）。</p>
+    <div class="row"><button class="btn btn-bob" id="act-clean">Bob: フィラーを除去</button><button class="btn btn-sm" id="act-clean-undo" ${cur.rows_before_clean?'':'disabled'}>整形前に戻す</button><span id="prog-1"></span><span style="flex:1"></span><button class="btn btn-primary" id="act-to-2">整形完了 → セルフレビューへ</button></div></div>`;
+  if(curStep===2) h = `<div class="card"><h3>② セルフレビュー — 自分で見て、気になったところを Notes に書く</h3>
+    <p class="hint">やり取りを読み返し、「ここでこう聞くべきだった」「これはGood」など気になった点を Notes 列に書きます。不要な行は削除（番号は自動で連番に振り直されます）。行の分割・結合もここで。</p>
+    <div class="row"><span class="hint" style="margin:0;">ノートのある行: <b>${live.filter(r=>r.note_ja).length}</b></span><span style="flex:1"></span><button class="btn btn-primary" id="act-to-3">セルフレビュー完了 → 英訳へ</button></div></div>`;
+  if(curStep===3) h = `<div class="card"><h3>③ 英訳 — Bobが全文と Notes を英訳し、番号を振り直す</h3>
+    <p class="hint">ルール（設定で編集可）：主語がない場合は Consultant=you / Client=I、言葉を綺麗にしすぎない、用語集の訳語を使う。訳文は「日英」表示で行ごとに直せます。</p>
+    <div class="row">
+      <button class="btn btn-bob" id="act-translate">Bob: 未訳の行を英訳</button>
+      <button class="btn btn-sm" id="act-retranslate">全行を訳し直す</button>
+      <span id="prog-3"></span>
+      <span class="hint" style="margin:0;">英訳済み: <b>${enDone}</b> / ${live.length}</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-primary" id="act-to-4" ${enDone<live.length?'disabled':''}>英訳完了 → 提出へ</button></div></div>`;
+  if(curStep===4) h = `<div class="card"><h3>④ 提出 — 英語版Wordを書き出してロバートに送る</h3>
+    <p class="hint">「提出用Word（英語）」をダウンロードしてロバートに送ります。同時に提出時点のスナップショットを保存し、戻ってきたWordとの差分抽出に使います。日本語版も同じ番号で出せます。</p>
+    <div class="row">
+      <button class="btn btn-primary" id="act-submit">提出用Word（英語）を書き出して「提出済み」にする</button>
+      <button class="btn" id="act-word-ja">日本語版Word</button>
+      <button class="btn" id="act-word-both">日英対訳Word</button>
+    </div>
+    ${cur.submitted_at?`<p class="hint" style="margin-top:10px;">提出済み: ${new Date(cur.submitted_at).toLocaleString('ja-JP')} ${filesHtml('submitted')}</p>`:''}</div>`;
+  if(curStep===5) h = `<div class="card"><h3>⑤ ロバートのレビュー — 戻ってきたWordを読み込む</h3>
+    <p class="hint">ロバートが Notes 列に書き込んで返してきたWordをここに入れると、提出時のスナップショットと比べてロバートの追記分だけを各行に取り出します。末尾や冒頭の総評もまとめて拾います。手で貼り付けたい場合は各行の「＋ロバートのコメント」から。</p>
+    <div class="dropzone" id="rob-drop">戻ってきた .docx をドロップ / クリックして選択</div><input type="file" id="rob-file" accept=".docx" class="hidden">
+    <div class="row" style="margin-top:12px;">
+      <button class="btn btn-bob" id="act-ja">Bob: ロバートのコメントを和訳（未訳分）</button>
+      <span id="prog-5"></span>
+      <span class="hint" style="margin:0;">コメント: <b>${robDone}</b>行 · 和訳済み <b>${jaDone}</b></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-primary" id="act-to-6">学びへ →</button>
+    </div>
+    ${filesHtml('returned')?`<p class="hint" style="margin-top:10px;">受領ファイル: ${filesHtml('returned')}</p>`:''}
+    <div class="grid2" style="margin-top:14px;">
+      <div class="fld"><label>ロバートの総評（EN）</label><textarea id="rob-overall-en" rows="7">${esc(cur.robert_overall_en||'')}</textarea></div>
+      <div class="fld"><label>総評の和訳</label><textarea id="rob-overall-ja" rows="7">${esc(cur.robert_overall_ja||'')}</textarea></div>
+    </div></div>`;
+  if(curStep===6){
+    const L = cur.learning||{};
+    const marked = live.filter(r=>r.robert_en);
+    h = `<div class="card"><h3>⑥ 学び — 整理して、いつでも見返せるようにする</h3>
+    <p class="hint">ロバートのコメントにタグをつけて傾向を見る（表の Notes 列で）。ここには自分の言葉で学びを書きます。分からなかった点をロバートと話し合った内容も残しておきます。</p>
+    <div class="fld"><label>ロバートの総評（和訳）</label><div class="overall">${esc(cur.robert_overall_ja||cur.robert_overall_en||'（まだありません）')}</div></div>
+    <div class="grid2">
+      <div class="fld"><label>自分の気づき・このセッションの主な学び</label><textarea id="learn-insights" rows="7" placeholder="例：クライアントの「価値がない」という言葉を追いかけず、実績の方向に逸れてしまった…">${esc(L.insights||'')}</textarea></div>
+      <div class="fld"><label>ロバートと話し合って深めた点・質問と答え</label><textarea id="learn-dialogue" rows="7" placeholder="分からなかった点をロバートに聞いた内容">${esc(L.dialogue||'')}</textarea></div>
+    </div>
+    <div class="fld"><label>次のセッションで試すこと</label><textarea id="learn-next" rows="3">${esc(L.next||'')}</textarea></div>
+    <div class="fld"><label>このセッションのテーマ・タグ</label><div class="row" id="learn-tags">${cur.learning_tags.map(t=>tagChip(t,'clickable')).join('')}<span class="tag-add" id="learn-tag-add">＋タグ</span></div></div>
+    <div class="row"><button class="btn btn-bob btn-sm" id="act-summarize">Bob: ロバートのコメントから学びの下書きを作る</button><span id="prog-6"></span><span style="flex:1"></span><button class="btn btn-primary" id="act-to-done">学び整理済みにする</button></div>
+    ${marked.length?`<details style="margin-top:14px;"><summary class="hint" style="cursor:pointer;">ロバートのコメント一覧（${marked.length}）</summary>${marked.map(r=>`<div class="learn-item"><div class="ctx">#${numOf(r)} ${r.speaker==='C'?'Consultant':'Client'}: ${esc((r.ja||r.en).slice(0,80))}${(r.ja||r.en).length>80?'…':''}</div><div class="rb">${esc(r.robert_ja||r.robert_en)}</div><div class="tagrow">${(r.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}</details>`:''}
+    </div>`;
+  }
+  p.innerHTML = h;
+  bindPanel();
+}
+function bindPanel(){
+  const on=(id,fn)=>{ const el=$(id); if(el) el.onclick=fn; };
+  on('act-clean', bobClean);
+  on('act-clean-undo', ()=>{ if(!cur.rows_before_clean) return; cur.rows=cur.rows_before_clean; delete cur.rows_before_clean; markDirty(); renderReport(); });
+  on('act-to-2', ()=>{ curStep=2; setStatus(STATUS_ORDER.indexOf(cur.status)<1?'self_review':cur.status); renderPanel(); });
+  on('act-to-3', ()=>{ curStep=3; ttLang='both'; renderSteps(); renderPanel(); renderTable(); });
+  on('act-translate', ()=>bobTranslate(false));
+  on('act-retranslate', ()=>{ if(confirm('すべての行を訳し直します（手直しした訳文も上書きされます）。よろしいですか？')) bobTranslate(true); });
+  on('act-to-4', ()=>{ curStep=4; setStatus(STATUS_ORDER.indexOf(cur.status)<2?'translated':cur.status); renderPanel(); });
+  on('act-submit', doSubmit);
+  on('act-word-ja', ()=>exportWord('ja'));
+  on('act-word-both', ()=>exportWord('both'));
+  on('act-ja', bobTranslateRobert);
+  on('act-to-6', ()=>{ curStep=6; renderSteps(); renderPanel(); });
+  on('act-summarize', bobLearningDraft);
+  on('act-to-done', ()=>{ setStatus('learned'); toast('学び整理済みにしました'); });
+  on('learn-tag-add', e=>openLearnTagPopover(e));
+  const rd=$('rob-drop'); if(rd){ rd.onclick=()=>$('rob-file').click(); rd.ondragover=e=>{e.preventDefault(); rd.classList.add('over');}; rd.ondragleave=()=>rd.classList.remove('over'); rd.ondrop=e=>{e.preventDefault(); rd.classList.remove('over'); if(e.dataTransfer.files[0]) importReturned(e.dataTransfer.files[0]);}; $('rob-file').onchange=e=>{ if(e.target.files[0]) importReturned(e.target.files[0]); }; }
+  const oe=$('rob-overall-en'); if(oe) oe.oninput=()=>{ cur.robert_overall_en=oe.value; markDirty(); };
+  const oj=$('rob-overall-ja'); if(oj) oj.oninput=()=>{ cur.robert_overall_ja=oj.value; markDirty(); };
+  ['insights','dialogue','next'].forEach(k=>{ const el=$('learn-'+k); if(el) el.oninput=()=>{ cur.learning[k]=el.value; markDirty(); }; });
+  document.querySelectorAll('#learn-tags .chip').forEach(c=>c.onclick=()=>{ cur.learning_tags=cur.learning_tags.filter(t=>t!==c.textContent); markDirty(); renderPanel(); });
+}
+function openLearnTagPopover(e){
+  document.querySelectorAll('.tag-popover').forEach(p=>p.remove());
+  const pop=document.createElement('div'); pop.className='tag-popover';
+  pop.innerHTML = tags.map(t=>`<span class="chip clickable c-${t.color} ${cur.learning_tags.includes(t.name)?'on':''}" data-n="${esc(t.name)}">${esc(t.name)}</span>`).join('')+`<input type="text" placeholder="新しいタグ + Enter" style="width:100%;margin-top:6px;padding:5px 8px;font-size:11px;">`;
+  document.body.appendChild(pop);
+  const rect=e.target.getBoundingClientRect(); pop.style.left=Math.min(rect.left, window.innerWidth-340)+'px'; pop.style.top=(rect.bottom+window.scrollY+4)+'px';
+  pop.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ const n=c.dataset.n; if(cur.learning_tags.includes(n)) cur.learning_tags=cur.learning_tags.filter(x=>x!==n); else cur.learning_tags.push(n); markDirty(); pop.remove(); renderPanel(); });
+  pop.querySelector('input').onkeydown=async ev=>{ if(ev.key==='Enter'){ const n=ev.target.value.trim(); if(!n) return; await addTag(n,'accent'); cur.learning_tags.push(n); markDirty(); pop.remove(); renderPanel(); } };
+  setTimeout(()=>document.addEventListener('click', function h(ev){ if(!pop.contains(ev.target)){ pop.remove(); document.removeEventListener('click',h);} }),0);
+}
+
+/* ============ BOB: フィラー除去 ============ */
+async function bobClean(){
+  if(!requireKey()) return;
+  const live = liveRows(); if(!live.length) return;
+  cur.rows_before_clean = JSON.parse(JSON.stringify(cur.rows));
+  const sys = `あなたは構造コンサルティングのセッション書き起こしを整形する編集者です。与えられた各発言から、フィラー（えー、あの、その、なんか、まあ、うーん、はい〔相槌のみのもの〕、〜ですね〔不要な語尾〕など）、言い直し・どもりの重複、意味のない繰り返しだけを取り除きます。
+厳守事項：
+- 言い換え・要約・補足・整理・順序変更は絶対にしない。話者の言葉づかい、曖昧さ、言いよどみの内容（「〜っていうか」「〜みたいな」など意味を持つもの）はそのまま残す。
+- 文の意味や情報量を減らさない。迷ったら残す。
+- 句読点を整えて読みやすくするのはよい。
+- 出力は入力と同じ件数・同じ i を持つ JSON 配列のみ: [{"i":番号,"t":"整形後テキスト"}]。説明文は不要。`;
+  try{
+    const results = await runBatches(live, 40, async (chunk)=>{
+      const inp = chunk.map(r=>({ i:r.seq, s:r.speaker==='C'?'Consultant':'Client', t:r.ja }));
+      const txt = await callClaude(sys, JSON.stringify(inp), 12000);
+      const arr = parseJsonLoose(txt);
+      return chunk.map(r=>{ const m=arr.find(x=>x.i===r.seq); return { id:r.id, t:(m&&typeof m.t==='string'&&m.t.trim())?m.t.trim():r.ja }; });
+    }, (d,t)=>setProgress($('prog-1'), d, t, '整形中'));
+    for(const x of results){ const r=cur.rows.find(y=>y.id===x.id); if(r) r.ja=x.t; }
+    setProgress($('prog-1'), -1);
+    markDirty(); renderPanel(); renderTable(); toast('フィラーを除去しました');
+  }catch(e){ setProgress($('prog-1'), -1); toast(e.message, true); }
+}
+
+/* ============ BOB: 英訳 ============ */
+function glossaryText(){ return glossary.length ? glossary.map(g=>`- ${g.ja} → ${g.en}${g.note?'（'+g.note+'）':''}`).join('\n') : '（なし）'; }
+async function bobTranslate(all){
+  if(!requireKey()) return;
+  const live = liveRows();
+  const targets = live.filter(r=> all || !r.en || (r.note_ja && !r.note_en));
+  if(!targets.length) return toast('未訳の行はありません');
+  const sys = `You are translating a Japanese structural-consulting session transcript into English so that Robert Fritz can review the consultant's work. Consultant = ${cur.consultant||'Chica'}. Client = ${cur.client_label||'the client'}.
+Translation rules:
+${getRules()}
+Glossary (Japanese → English, always use these):
+${glossaryText()}
+Output: a JSON array only, same count and same "i" as input: [{"i":number,"en":"...","note_en":"..."}]. note_en is the English of the consultant's own note (empty string if no note). No commentary.`;
+  try{
+    const results = await runBatches(targets, 25, async (chunk)=>{
+      // 文脈として前後2行を添える
+      const ctx = i => { const k=live.indexOf(i); return live.slice(Math.max(0,k-2),k).map(r=>`${r.speaker==='C'?'Consultant':'Client'}: ${r.ja}`).join('\n'); };
+      const inp = chunk.map(r=>({ i:r.seq, speaker:r.speaker==='C'?'Consultant':'Client', ja:r.ja, note_ja:r.note_ja||'', context_before:ctx(r) }));
+      const txt = await callClaude(sys, JSON.stringify(inp), 16000);
+      const arr = parseJsonLoose(txt);
+      return chunk.map(r=>{ const m=arr.find(x=>x.i===r.seq)||{}; return { id:r.id, en:m.en||'', note_en:m.note_en||'' }; });
+    }, (d,t)=>setProgress($('prog-3'), d, t, '英訳中'));
+    for(const x of results){ const r=cur.rows.find(y=>y.id===x.id); if(!r) continue; if(x.en) r.en=x.en; if(r.note_ja) r.note_en = x.note_en || r.note_en; }
+    setProgress($('prog-3'), -1);
+    ttLang='both'; markDirty(); renderSteps(); renderPanel(); renderTable(); toast('英訳しました');
+  }catch(e){ setProgress($('prog-3'), -1); toast(e.message, true); }
+}
+
+/* ============ 提出 & Word ============ */
+async function doSubmit(){
+  const live = liveRows();
+  if(live.some(r=>!r.en)) { if(!confirm('英訳されていない行があります。それでも提出用Wordを作りますか？')) return; }
+  await exportWord('en', true);
+  cur.submitted_snapshot = live.map(r=>({ id:r.id, num:numOf(r), speaker:r.speaker, en:r.en, note_en:r.note_en||'' }));
+  cur.submitted_at = new Date().toISOString();
+  await setStatus('submitted'); curStep=5; renderPanel(); renderTable();
+  toast('提出用Wordを書き出し、提出済みにしました');
+}
+function docxParagraphs(text, opts={}){
+  const D=docx; const lines=(text||'').split('\n');
+  return lines.map(l=>new D.Paragraph({ children:[new D.TextRun({ text:l, size:opts.size||18, font:opts.font||'Calibri', color:opts.color, italics:opts.italics })], spacing:{after:opts.after??40} }));
+}
+function cellParas(parts){ // parts: [{text, color?, italics?, label?}]
+  const D=docx; const out=[];
+  for(const p of parts){ if(!p.text) continue;
+    if(p.label) out.push(new D.Paragraph({ children:[new D.TextRun({ text:p.label, size:14, bold:true, color:p.color||'888888', font:'Calibri' })], spacing:{after:0} }));
+    out.push(...docxParagraphs(p.text, { size:p.size||18, color:p.color, italics:p.italics, font:p.font }));
+  }
+  if(!out.length) out.push(new D.Paragraph({ children:[new D.TextRun({text:'', size:18})] }));
+  return out;
+}
+async function exportWord(mode, store=false){
+  const D = docx; const live = liveRows();
+  const B = { top:{style:D.BorderStyle.SINGLE,size:4,color:'BFBFBF'}, bottom:{style:D.BorderStyle.SINGLE,size:4,color:'BFBFBF'}, left:{style:D.BorderStyle.SINGLE,size:4,color:'BFBFBF'}, right:{style:D.BorderStyle.SINGLE,size:4,color:'BFBFBF'} };
+  const W = [700, 5200, 5200, 4400]; // DXA (landscape A4 ≈ 15,600 usable)
+  const cell = (children, w, shade) => new D.TableCell({ children, width:{size:w,type:D.WidthType.DXA}, borders:B, margins:{top:60,bottom:60,left:90,right:90}, shading: shade?{fill:shade,type:D.ShadingType.CLEAR,color:'auto'}:undefined });
+  const hdr = ['#','Consultant','Client','Notes'].map((t,i)=>cell([new D.Paragraph({children:[new D.TextRun({text:t,bold:true,size:18,font:'Calibri'})]})], W[i], 'EDEDED'));
+  const rows = [ new D.TableRow({ children:hdr, tableHeader:true }) ];
+  let n=0;
+  for(const r of live){ n++;
+    const textParts = mode==='en' ? [{text:r.en||r.ja}] : mode==='ja' ? [{text:r.ja}] : [{text:r.ja},{text:r.en,color:'3F4C5A'}];
+    const noteParts = [];
+    if(mode==='en'){ noteParts.push({text:r.note_en||r.note_ja}); if(store===false && r.robert_en) noteParts.push({text:r.robert_en, color:'9C3B2E', label:'Robert'}); }
+    else if(mode==='ja'){ noteParts.push({text:r.note_ja}); if(r.robert_ja||r.robert_en) noteParts.push({text:r.robert_ja||r.robert_en, color:'9C3B2E', label:'Robert'}); }
+    else { noteParts.push({text:r.note_ja}); if(r.note_en) noteParts.push({text:r.note_en,color:'3F4C5A'}); if(r.robert_en) noteParts.push({text:r.robert_en,color:'9C3B2E',label:'Robert'}); if(r.robert_ja) noteParts.push({text:r.robert_ja,color:'9C3B2E'}); if(r.tags?.length) noteParts.push({text:'['+r.tags.join(' / ')+']', color:'888888', size:14}); }
+    rows.push(new D.TableRow({ children:[
+      cell(cellParas([{text:String(n)}]), W[0]),
+      cell(r.speaker==='C'?cellParas(textParts):cellParas([]), W[1]),
+      cell(r.speaker==='L'?cellParas(textParts):cellParas([]), W[2]),
+      cell(cellParas(noteParts), W[3]),
+    ]}));
+  }
+  const headLine = `Consultant: ${cur.consultant||'Chica'}      Client: ${cur.client_label||''}      Date of session: ${fmtDateEn(cur.session_date)}      Length of session: ${cur.length_min||''} min`;
+  const children = [
+    new D.Paragraph({ children:[new D.TextRun({text:'Structural Consulting Session Report', bold:true, size:28, font:'Calibri'})], spacing:{after:120} }),
+    new D.Paragraph({ children:[new D.TextRun({text:headLine, size:20, font:'Calibri'})], spacing:{after:200} }),
+  ];
+  if(mode!=='en' || store===false){
+    if(cur.robert_overall_en && mode!=='ja') children.push(new D.Paragraph({children:[new D.TextRun({text:'Robert — overall comment', bold:true, size:18, color:'9C3B2E'})]}), ...docxParagraphs(cur.robert_overall_en,{size:18,after:120}));
+    if(cur.robert_overall_ja && mode!=='en') children.push(...docxParagraphs(cur.robert_overall_ja,{size:18,after:200}));
+    if(mode==='both' && (cur.learning?.insights||cur.learning?.dialogue||cur.learning?.next)){
+      children.push(new D.Paragraph({children:[new D.TextRun({text:'学び', bold:true, size:18})]}));
+      if(cur.learning.insights) children.push(...docxParagraphs('■ 気づき\n'+cur.learning.insights,{size:18}));
+      if(cur.learning.dialogue) children.push(...docxParagraphs('■ ロバートと話し合って深めた点\n'+cur.learning.dialogue,{size:18}));
+      if(cur.learning.next) children.push(...docxParagraphs('■ 次に試すこと\n'+cur.learning.next,{size:18,after:200}));
+    }
+  }
+  children.push(new D.Table({ rows, width:{size:W.reduce((a,b)=>a+b,0),type:D.WidthType.DXA}, columnWidths:W }));
+  const doc = new D.Document({ styles:{ default:{ document:{ run:{ font:'Calibri', size:18 } } } },
+    sections:[{ properties:{ page:{ size:{ orientation:D.PageOrientation.LANDSCAPE, width:16838, height:11906 }, margin:{ top:720, bottom:720, left:720, right:720 } } }, children }] });
+  const blob = await D.Packer.toBlob(doc);
+  const base = `${(cur.client_label||'Session').replace(/[\\/:*?"<>|]/g,'_')}_${(cur.session_date||'').replace(/-/g,'')}`;
+  const name = mode==='en' ? `${base}_EN.docx` : mode==='ja' ? `${base}_JA.docx` : `${base}_JA-EN_review.docx`;
+  download(name, blob);
+  if(store){
+    const path = `${cur.id}/submitted_${Date.now()}_${name}`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, blob);
+    if(!error){ cur.files.push({ kind:'submitted', path, name, at:new Date().toISOString() }); }
+  }
+}
+
+/* ============ ロバートのレビュー取り込み ============ */
+async function importReturned(file){
+  try{
+    const blocks = await parseDocx(await file.arrayBuffer());
+    const tpl = templateFromDocx(blocks);
+    if(!tpl) return toast('テンプレート形式の表が見つかりませんでした', true);
+    const snap = cur.submitted_snapshot || liveRows().map(r=>({ id:r.id, num:numOf(r), speaker:r.speaker, en:r.en, note_en:r.note_en||'' }));
+    let found=0, unmatched=0;
+    const norm = s => (s||'').replace(/\s+/g,' ').trim();
+    for(const rr of tpl.rows){
+      const s = snap.find(x=>x.num===rr.num) || snap[rr.num-1];
+      if(!s){ unmatched++; continue; }
+      const row = cur.rows.find(x=>x.id===s.id); if(!row) continue;
+      const ret = norm(rr.note), own = norm(s.note_en);
+      let added = '';
+      if(!ret) continue;
+      if(own && ret.startsWith(own)) added = ret.slice(own.length).trim();
+      else if(own && ret.includes(own)) added = ret.replace(own,'').trim();
+      else if(own && ret===own) added='';
+      else added = ret;          // 自分のノートがない行に書かれている = ロバート
+      if(added){ row.robert_en = added; found++; }
+    }
+    const extras = [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
+    const isJa = p => (p.match(/[\u3040-\u30ff\u4e00-\u9fff]/g)||[]).length > p.length*0.2;
+    const exEn = extras.filter(p=>!isJa(p)).join('\n\n'), exJa = extras.filter(isJa).join('\n\n');
+    if(exEn && !(cur.robert_overall_en||'').includes(exEn)) cur.robert_overall_en = [cur.robert_overall_en, exEn].filter(Boolean).join('\n\n');
+    if(exJa && !(cur.robert_overall_ja||'').includes(exJa)) cur.robert_overall_ja = [cur.robert_overall_ja, exJa].filter(Boolean).join('\n\n');
+    const path = `${cur.id}/returned_${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+    if(!error) cur.files.push({ kind:'returned', path, name:file.name, at:new Date().toISOString() });
+    if(STATUS_ORDER.indexOf(cur.status)<4) cur.status='reviewed';
+    await saveCur(); renderReport();
+    toast(`ロバートのコメントを ${found} 行に取り込みました${unmatched?`（対応行なし ${unmatched}）`:''}`);
+  }catch(e){ toast('読み込みエラー: '+e.message, true); }
+}
+
+/* ============ BOB: ロバートのコメントを和訳 ============ */
+async function bobTranslateRobert(){
+  if(!requireKey()) return;
+  const live = liveRows();
+  const targets = live.filter(r=>r.robert_en && r.robert_en.trim() && !r.robert_ja);
+  const needOverall = cur.robert_overall_en && !cur.robert_overall_ja;
+  if(!targets.length && !needOverall) return toast('未訳のコメントはありません');
+  const sys = `あなたは Robert Fritz の構造コンサルティング指導コメントを、指導を受けた本人（コンサルタント、日本語話者）のために和訳する翻訳者です。
+スタイル：
+- ロバートの口調（率直・簡潔・ときにユーモア）を保つ。敬語にしすぎない。「君は〜」のように本人に語りかける形。
+- 構造思考の重要な用語は、和訳のあとに英語を括弧で併記する。例：根底にある構造(underlying structure)、軌道から外れた(getting off track)、無力さ(powerlessness)、現実(reality)、理想/信念/現実(ideal/belief/reality)。
+- 意味を補って説明したい場合は〔 〕で短く添えてよいが、原文にないことを足さない。
+- "Good." は「Good.」のままでよい。
+- 用語集：
+${glossaryText()}
+各項目には文脈（クライアント/コンサルタントの該当発言）を添えるので、それを踏まえて訳す。
+出力は JSON 配列のみ: [{"i":番号,"ja":"和訳"}]。`;
+  try{
+    if(targets.length){
+      const results = await runBatches(targets, 20, async chunk=>{
+        const inp = chunk.map(r=>({ i:r.seq, context:`${r.speaker==='C'?'Consultant':'Client'}: ${r.en||r.ja}`, own_note:r.note_en||'', robert:r.robert_en }));
+        const arr = parseJsonLoose(await callClaude(sys, JSON.stringify(inp), 12000));
+        return chunk.map(r=>({ id:r.id, ja:(arr.find(x=>x.i===r.seq)||{}).ja||'' }));
+      }, (d,t)=>setProgress($('prog-5'), d, t, '和訳中'));
+      for(const x of results){ const r=cur.rows.find(y=>y.id===x.id); if(r && x.ja) r.robert_ja=x.ja; }
+    }
+    if(needOverall){
+      setProgress($('prog-5'), 1, 1, '総評を和訳中');
+      const arr = parseJsonLoose(await callClaude(sys, JSON.stringify([{ i:0, context:'(overall comment on the whole session)', robert:cur.robert_overall_en }]), 6000));
+      cur.robert_overall_ja = (arr[0]||{}).ja || '';
+    }
+    setProgress($('prog-5'), -1);
+    markDirty(); renderPanel(); renderTable(); toast('和訳しました');
+  }catch(e){ setProgress($('prog-5'), -1); toast(e.message, true); }
+}
+
+/* ============ BOB: 学びの下書き ============ */
+async function bobLearningDraft(){
+  if(!requireKey()) return;
+  const live = liveRows();
+  const items = live.filter(r=>r.robert_en).map(r=>`#${numOf(r)} [${r.speaker==='C'?'Consultant':'Client'}: ${(r.en||r.ja).slice(0,160)}]\n  own note: ${r.note_en||r.note_ja||'-'}\n  Robert: ${r.robert_en}`).join('\n');
+  if(!items && !cur.robert_overall_en) return toast('ロバートのコメントがまだありません', true);
+  const sys = `あなたは構造コンサルティングを学ぶコンサルタントの学習パートナーです。ロバート・フリッツのレビューコメントをもとに、本人が自分の言葉で書き直すための「学びの下書き」を日本語で作ります。
+- ロバートが繰り返し指摘しているパターン、うまくいった点（Good）、次回に試す具体的な問いかけの3点を、箇条書き（■）で簡潔に。
+- 断定的な性格評価はしない。セッション中の具体的な行為に紐づける。
+- 構造思考の用語は英語を括弧で併記。
+出力は JSON: {"insights":"...","next":"...","tags":["タグ候補",...]}（tagsは既存タグから選ぶ: ${tags.map(t=>t.name).join(', ')}）`;
+  try{
+    setProgress($('prog-6'), 1, 1, '下書き作成中');
+    const txt = await callClaude(sys, `Overall comment:\n${cur.robert_overall_en||'-'}\n\nRow comments:\n${items}`, 4000);
+    const m = txt.match(/\{[\s\S]*\}/); const obj = JSON.parse(m?m[0]:txt);
+    if(obj.insights && !(cur.learning.insights||'').trim()) cur.learning.insights = obj.insights; else if(obj.insights) cur.learning.insights += '\n\n--- Bobの下書き ---\n'+obj.insights;
+    if(obj.next && !(cur.learning.next||'').trim()) cur.learning.next = obj.next; else if(obj.next) cur.learning.next += '\n'+obj.next;
+    for(const t of (obj.tags||[])) if(tagObj(t) && !cur.learning_tags.includes(t)) cur.learning_tags.push(t);
+    setProgress($('prog-6'), -1); markDirty(); renderPanel(); toast('下書きを入れました。自分の言葉で書き直してください');
+  }catch(e){ setProgress($('prog-6'), -1); toast(e.message, true); }
+}
+
+/* ============ FILES ============ */
+$('rep-files-btn').onclick = async ()=>{
+  const box=$('gen-modal-box');
+  const kinds={source:'元データ',submitted:'提出',returned:'受領',other:'その他'};
+  box.innerHTML = `<h3>ファイル</h3><div class="file-list">${cur.files.length?cur.files.map((f,i)=>`<div class="file-row"><span class="k">${kinds[f.kind]||f.kind}</span><a href="#" data-i="${i}">${esc(f.name)}</a><span class="hint" style="margin:0;">${new Date(f.at).toLocaleDateString('ja-JP')}</span><button class="btn btn-xs btn-danger" data-del="${i}">削除</button></div>`).join(''):'<div class="empty">ファイルはありません</div>'}</div>
+    <div class="row" style="margin-top:12px;"><input type="file" id="file-add"><span class="hint" style="margin:0;">追加（メールの控えなど）</span></div>
+    <div class="modal-foot"><button class="btn" id="gm-close">閉じる</button></div>`;
+  $('gen-modal').classList.remove('hidden');
+  $('gm-close').onclick=()=>$('gen-modal').classList.add('hidden');
+  box.querySelectorAll('a[data-i]').forEach(a=>a.onclick=async e=>{ e.preventDefault(); const f=cur.files[a.dataset.i]; const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(f.path, 3600); if(error) return toast(error.message,true); window.open(data.signedUrl,'_blank'); });
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async ()=>{ if(!confirm('削除しますか？')) return; const f=cur.files[b.dataset.del]; await supabase.storage.from(BUCKET).remove([f.path]); cur.files.splice(b.dataset.del,1); await saveCur(); $('rep-files-btn').click(); });
+  $('file-add').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const path=`${cur.id}/other_${Date.now()}_${f.name}`; const { error }=await supabase.storage.from(BUCKET).upload(path,f); if(error) return toast(error.message,true); cur.files.push({kind:'other',path,name:f.name,at:new Date().toISOString()}); await saveCur(); $('rep-files-btn').click(); };
+};
+
+/* ============ LEARNING VIEW ============ */
+let learnTag = null, learnCache = null;
+$('learn-search').oninput = ()=> renderLearning(true);
+async function renderLearning(fromCache){
+  if(!fromCache || !learnCache){
+    const { data, error } = await supabase.from('sc_reports').select('id,title,client_label,session_date,status,rows,learning,learning_tags,robert_overall_ja,robert_overall_en').order('session_date',{ascending:false});
+    if(error) return toast(error.message,true);
+    learnCache = data||[];
+  }
+  const all = learnCache;
+  const counts = {}; for(const t of tags) counts[t.name]=0;
+  const comments = [];
+  for(const r of all){ let n=0; for(const row of (r.rows||[])){ if(row.deleted) continue; n++; if(row.robert_en||row.robert_ja){ comments.push({ rep:r, num:n, row }); for(const t of (row.tags||[])) counts[t]=(counts[t]||0)+1; } } for(const t of (r.learning_tags||[])) counts[t]=(counts[t]||0)+1; }
+  $('learn-tiles').innerHTML = `<div class="tile ${learnTag===null?'sel':''}" data-t=""><div class="n">${comments.length}</div><div class="l">コメント総数 · ${all.length}セッション</div></div>` +
+    Object.entries(counts).filter(([,c])=>c>0).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`<div class="tile ${learnTag===t?'sel':''}" data-t="${esc(t)}"><div class="n">${c}</div><div class="l">${tagChip(t)}</div></div>`).join('');
+  $('learn-tiles').querySelectorAll('.tile').forEach(x=>x.onclick=()=>{ learnTag = x.dataset.t||null; renderLearning(true); });
+  const q = $('learn-search').value.trim().toLowerCase();
+  let h='';
+  for(const r of all){
+    const L=r.learning||{};
+    const cs = comments.filter(c=>c.rep===r && (!learnTag || (c.row.tags||[]).includes(learnTag)) && (!q || [c.row.robert_ja,c.row.robert_en,c.row.ja,c.row.en].join(' ').toLowerCase().includes(q)));
+    const memoHit = (!learnTag || (r.learning_tags||[]).includes(learnTag)) && (!q || [L.insights,L.dialogue,L.next,r.robert_overall_ja].join(' ').toLowerCase().includes(q)) && (L.insights||L.dialogue||L.next);
+    if(!cs.length && !memoHit) continue;
+    h += `<div class="card"><div class="row" style="margin-bottom:8px;"><b><a href="#r/${r.id}" style="text-decoration:none;">${esc(r.title||'(無題)')}</a></b><span class="hint" style="margin:0;">${fmtDate(r.session_date)} · ${esc(r.client_label||'')}</span>${(r.learning_tags||[]).map(t=>tagChip(t)).join('')}<span class="status st-${r.status}" style="margin-left:auto;">${STATUS_LABEL[r.status]||''}</span></div>
+      ${memoHit?`<div style="font-size:12.5px;line-height:1.8;margin-bottom:10px;">${L.insights?`<div><b style="font-size:11px;color:var(--text-muted);">気づき</b><div style="white-space:pre-wrap;">${esc(L.insights)}</div></div>`:''}${L.dialogue?`<div style="margin-top:6px;"><b style="font-size:11px;color:var(--text-muted);">ロバートと深めた点</b><div style="white-space:pre-wrap;">${esc(L.dialogue)}</div></div>`:''}${L.next?`<div style="margin-top:6px;"><b style="font-size:11px;color:var(--text-muted);">次に試すこと</b><div style="white-space:pre-wrap;">${esc(L.next)}</div></div>`:''}</div>`:''}
+      ${cs.map(c=>`<div class="learn-item"><div class="ctx">#${c.num} ${c.row.speaker==='C'?'Consultant':'Client'}: ${esc((c.row.ja||c.row.en).slice(0,100))}${(c.row.ja||c.row.en).length>100?'…':''}</div><div class="rb">${esc(c.row.robert_ja||c.row.robert_en)}</div>${c.row.robert_ja&&c.row.robert_en?`<div class="rb" style="color:#3F4C5A;font-size:11.5px;margin-top:3px;">${esc(c.row.robert_en)}</div>`:''}<div class="tagrow">${(c.row.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}
+    </div>`;
+  }
+  $('learn-body').innerHTML = h || '<div class="empty">まだ学びがありません。レポートのステップ⑤⑥で、ロバートのコメントにタグをつけたり学びを書いたりすると、ここに集まります。</div>';
+}
+
+/* ============ SETTINGS VIEW ============ */
+function renderSettings(){
+  $('set-rules').value = getRules();
+  $('api-key-input2').value = localStorage.getItem(KEY_NAME)||'';
+  $('gloss-list').innerHTML = glossary.map(g=>`<div class="row" style="margin-bottom:6px;"><input type="text" value="${esc(g.ja)}" data-id="${g.id}" data-f="ja" style="flex:1;"><span class="hint" style="margin:0;">→</span><input type="text" value="${esc(g.en)}" data-id="${g.id}" data-f="en" style="flex:1;"><button class="btn btn-xs btn-danger" data-del="${g.id}">削除</button></div>`).join('') || '<div class="hint">まだありません</div>';
+  $('gloss-list').querySelectorAll('input').forEach(i=>i.onchange=async ()=>{ const { error }=await supabase.from('sc_glossary').update({[i.dataset.f]:i.value.trim()}).eq('id',i.dataset.id); if(error) toast(error.message,true); else { const g=glossary.find(x=>x.id===i.dataset.id); g[i.dataset.f]=i.value.trim(); } });
+  $('gloss-list').querySelectorAll('[data-del]').forEach(b=>b.onclick=async ()=>{ await supabase.from('sc_glossary').delete().eq('id',b.dataset.del); glossary=glossary.filter(g=>g.id!==b.dataset.del); renderSettings(); });
+  $('tag-list').innerHTML = tags.map(t=>`<span class="chip c-${t.color}">${esc(t.name)} <span class="x" data-del="${t.id}">✕</span></span>`).join('') || '<div class="hint">まだありません</div>';
+  $('tag-list').querySelectorAll('[data-del]').forEach(b=>b.onclick=async ()=>{ if(!confirm('このタグを削除しますか？（各行につけたタグ名は残ります）')) return; await supabase.from('sc_tags').delete().eq('id',b.dataset.del); tags=tags.filter(t=>t.id!==b.dataset.del); renderSettings(); });
+}
+$('set-rules-save').onclick=()=>{ localStorage.setItem('sr_rules', $('set-rules').value); toast('保存しました（このブラウザに保存）'); };
+$('set-rules-reset').onclick=()=>{ localStorage.removeItem('sr_rules'); renderSettings(); };
+$('gloss-add').onclick=async ()=>{ const ja=$('gloss-ja').value.trim(), en=$('gloss-en').value.trim(); if(!ja||!en) return; const { data, error }=await supabase.from('sc_glossary').insert({ja,en}).select().single(); if(error) return toast(error.message,true); glossary.push(data); $('gloss-ja').value=''; $('gloss-en').value=''; renderSettings(); };
+async function addTag(name,color){ if(tagObj(name)) return; const { data, error }=await supabase.from('sc_tags').insert({name,color}).select().single(); if(error){ toast(error.message,true); return; } tags.push(data); }
+$('tag-add').onclick=async ()=>{ const n=$('tag-name').value.trim(); if(!n) return; await addTag(n,$('tag-color').value); $('tag-name').value=''; renderSettings(); };
+
+init();
+</script>
+</body>
+</html>
