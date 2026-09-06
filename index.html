@@ -680,7 +680,11 @@ async function handleNewFile(f){
       $('new-create').disabled = false;
       return;
     }
-    $('new-text').value = blocks.filter(b=>b.type==='p').map(b=>b.text).join('\n');
+    const txt = blocks.filter(b=>b.type==='p').map(b=>b.text).join('\n');
+    $('new-text').value = txt;
+    // AInote の見出し（例: 2026.09.06 日 午前 8:06 ・ 48分 11秒）から日付と長さを拾う
+    const md = txt.slice(0,400).match(/(20\d{2})[.\/年](\d{1,2})[.\/月](\d{1,2})/); if(md) $('new-date').value = `${md[1]}-${md[2].padStart(2,'0')}-${md[3].padStart(2,'0')}`;
+    const ml = txt.slice(0,400).match(/(?:(\d+)\s*時間)?\s*(\d+)\s*分/); if(ml) $('new-length').value = (parseInt(ml[1]||0)*60 + parseInt(ml[2])) || $('new-length').value;
   } else {
     $('new-text').value = await f.text();
   }
