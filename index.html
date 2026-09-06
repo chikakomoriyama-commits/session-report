@@ -266,7 +266,7 @@
             <label class="chip clickable">本文の言語：</label>
             <div class="seg" id="tpl-lang"><button data-v="ja" class="on">日本語</button><button data-v="en">English</button></div>
             <label class="chip clickable">Notes列の扱い：</label>
-            <div class="seg" id="tpl-notes"><button data-v="own" class="on">自分のメモ</button><button data-v="robert">ロバートのコメント</button><button data-v="split">英語=ロバート / 日本語=自分</button></div>
+            <div class="seg" id="tpl-notes"><button data-v="bold" class="on">太字=ロバート / それ以外=自分</button><button data-v="own">すべて自分のメモ</button><button data-v="robert">すべてロバート</button><button data-v="split">英語=ロバート / 日本語=自分</button></div>
           </div>
         </div>
         <div id="new-speakers" class="hidden" style="margin-top:14px;">
@@ -282,10 +282,10 @@
       </div>
       <div class="card">
         <h3>過去のレポートをまとめて取り込む（保管用）</h3>
-        <p class="hint">ロバートから返ってきた過去のWord（テンプレート形式）を複数まとめて選ぶと、1ファイル＝1レポートとして「レビュー受領」状態で保管します。本文の言語はファイルごとに自動判定、日付・Client・長さは見出し行から、タイトルはファイル名から入ります。取り込み後、各レポートを開いて必要なところだけ直せます（表の各行「⇄」でメモとロバートのコメントを入れ替え可）。</p>
+        <p class="hint">ロバートから返ってきた過去のWord（テンプレート形式）を複数まとめて選ぶと、1ファイル＝1レポートとして「レビュー受領」状態で保管します。ロバートのコメントは太字で書かれているので、太字の部分をロバート、それ以外を自分のメモとして振り分けます（太字がないファイルは「英語=ロバート／日本語=自分」で振り分け）。本文の言語はファイルごとに自動判定、日付・Client・長さは見出し行から、タイトルはファイル名から入ります。取り込み後、各レポートを開いて必要なところだけ直せます（表の各行「⇄」でメモとロバートのコメントを入れ替え可）。</p>
         <div class="row" style="gap:18px;margin-bottom:12px;">
           <label class="chip clickable">Notes列の扱い：</label>
-          <div class="seg" id="bulk-notes"><button data-v="split" class="on">英語=ロバート / 日本語=自分</button><button data-v="robert">すべてロバート</button><button data-v="own">すべて自分のメモ</button></div>
+          <div class="seg" id="bulk-notes"><button data-v="bold" class="on">太字=ロバート / それ以外=自分</button><button data-v="split">英語=ロバート / 日本語=自分</button><button data-v="robert">すべてロバート</button><button data-v="own">すべて自分のメモ</button></div>
         </div>
         <div class="dropzone" id="bulk-drop">ここに複数の .docx をドロップ、またはクリックして選択</div><input type="file" id="bulk-file" accept=".docx" multiple class="hidden">
         <div id="bulk-log" style="margin-top:12px;font-size:12px;line-height:1.9;"></div>
@@ -563,21 +563,31 @@ async function parseDocx(arrayBuffer){
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
   const body = doc.getElementsByTagNameNS(W,'body')[0];
-  const pText = p => { let s=''; const walk=n=>{ for(const c of n.childNodes){ if(c.nodeType!==1) continue; const ln=c.localName; if(ln==='t') s+=c.textContent; else if(ln==='tab') s+='\t'; else if(ln==='br'||ln==='cr') s+='\n'; else if(ln!=='rPr'&&ln!=='pPr') walk(c);} }; walk(p); return s; };
+  // 段落 → { text, bold, plain }  bold = 太字ランだけを繋いだ文字列、plain = 太字でない部分
+  const isBoldRun = r => { const rPr=[...r.childNodes].find(c=>c.nodeType===1&&c.localName==='rPr'); if(!rPr) return false; const b=[...rPr.childNodes].find(c=>c.nodeType===1&&c.localName==='b'); if(!b) return false; const v=b.getAttributeNS(W,'val')||b.getAttribute('w:val'); return !(v==='0'||v==='false'); };
+  const pText = p => { let s='', bold='', plain='';
+    const walk=(n,inBold)=>{ for(const c of n.childNodes){ if(c.nodeType!==1) continue; const ln=c.localName;
+      if(ln==='t'){ s+=c.textContent; if(inBold) bold+=c.textContent; else plain+=c.textContent; }
+      else if(ln==='tab'){ s+='\t'; }
+      else if(ln==='br'||ln==='cr'){ s+='\n'; if(inBold) bold+='\n'; else plain+='\n'; }
+      else if(ln==='r') walk(c, isBoldRun(c));
+      else if(ln!=='rPr'&&ln!=='pPr') walk(c, inBold); } };
+    walk(p,false); return { text:s, bold:bold.trim(), plain:plain.trim() }; };
+  const joinP = ps => ({ text:ps.map(x=>x.text).join('\n').trim(), bold:ps.map(x=>x.bold).filter(Boolean).join('\n').trim(), plain:ps.map(x=>x.plain).filter(Boolean).join('\n').trim() });
   const out=[];
   for(const el of body.childNodes){
     if(el.nodeType!==1) continue;
-    if(el.localName==='p'){ out.push({type:'p', text:pText(el)}); }
+    if(el.localName==='p'){ const t=pText(el); out.push({type:'p', text:t.text, bold:t.bold, plain:t.plain}); }
     else if(el.localName==='tbl'){
-      const rows=[];
+      const rows=[], rich=[];
       for(const tr of el.getElementsByTagNameNS(W,'tr')){
         if(tr.parentNode!==el) continue;
-        const cells=[];
+        const cells=[], rcells=[];
         for(const tc of tr.childNodes){ if(tc.nodeType!==1||tc.localName!=='tc') continue;
-          const ps=[]; for(const p of tc.getElementsByTagNameNS(W,'p')) ps.push(pText(p)); cells.push(ps.join('\n').trim()); }
-        rows.push(cells);
+          const ps=[]; for(const p of tc.getElementsByTagNameNS(W,'p')) ps.push(pText(p)); const j=joinP(ps); cells.push(j.text); rcells.push(j); }
+        rows.push(cells); rich.push(rcells);
       }
-      out.push({type:'table', rows});
+      out.push({type:'table', rows, rich});
     }
   }
   return out;
@@ -587,14 +597,17 @@ function templateFromDocx(blocks){
   const tbl = blocks.find(b=>b.type==='table' && b.rows.length>1 && b.rows[0].length>=4 && /#/.test(b.rows[0][0]));
   if(!tbl) return null;
   const rows=[];
-  for(const r of tbl.rows.slice(1)){
-    const [n,c,l,note] = r;
+  tbl.rows.slice(1).forEach((r,i)=>{
+    const [n,c,l,note] = r; const rc = (tbl.rich||[])[i+1]?.[3] || {};
     const speaker = (c||'').trim() ? 'C' : 'L';
-    rows.push({ num:parseInt(n)||rows.length+1, speaker, text:((speaker==='C'?c:l)||'').trim(), note:(note||'').trim() });
-  }
+    rows.push({ num:parseInt(n)||rows.length+1, speaker, text:((speaker==='C'?c:l)||'').trim(), note:(note||'').trim(), note_bold:(rc.bold||''), note_plain:(rc.plain||'') });
+  });
   const tblIdx = blocks.indexOf(tbl);
   const before = blocks.slice(0,tblIdx).filter(b=>b.type==='p').map(b=>b.text.trim()).filter(Boolean);
   const after  = blocks.slice(tblIdx+1).filter(b=>b.type==='p').map(b=>b.text.trim()).filter(Boolean);
+  // 表の外の段落のうち太字のもの（ロバートの総評は太字で書かれる）
+  const extraBold = [...blocks.slice(0,tblIdx), ...blocks.slice(tblIdx+1)].filter(b=>b.type==='p' && b.bold && b.bold.length>20 && !/^Structural Consulting Session Report$/i.test(b.text.trim()) && !/Consultant\s*[:：]/.test(b.text)).map(b=>b.bold);
+  const hasBold = rows.some(r=>r.note_bold) || extraBold.length>0;
   const head = {};
   for(const p of before){
     const m1=p.match(/Consultant\s*[:：]\s*(.+?)(?:\s{2,}|\t|$)/); if(m1) head.consultant=m1[1].trim();
@@ -603,7 +616,7 @@ function templateFromDocx(blocks){
     const m4=p.match(/Length of session\s*[:：]\s*(\d+)/); if(m4) head.length=parseInt(m4[1]);
   }
   const isHeaderLine = p => /^Structural Consulting Session Report$/i.test(p) || /Consultant\s*[:：]/.test(p);
-  return { rows, head, extraBefore: before.filter(p=>!isHeaderLine(p)), extraAfter: after };
+  return { rows, head, extraBefore: before.filter(p=>!isHeaderLine(p)), extraAfter: after, extraBold, hasBold };
 }
 
 /* ============ DATA ============ */
@@ -728,19 +741,7 @@ $('new-create').onclick = async ()=>{
   let rows = [], speaker_map = {}, payloadConsultant = 'Chica';
   if(newDocxTemplate){
     const lang = $('tpl-lang').querySelector('button.on').dataset.v, notesMode = $('tpl-notes').querySelector('button.on').dataset.v;
-    const isJa = t => /[\u3040-\u30ff\u4e00-\u9fff]/.test(t||'');
-    rows = newDocxTemplate.rows.map((r,i)=>{
-      const row = { id:uid(), seq:i+1, speaker:r.speaker, ja:lang==='ja'?r.text:'', en:lang==='en'?r.text:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false };
-      const n = r.note||'';
-      if(!n) return row;
-      if(notesMode==='own'){ if(isJa(n)) row.note_ja=n; else row.note_en=n; }
-      else if(notesMode==='robert'){ if(isJa(n)) row.robert_ja=n; else row.robert_en=n; }
-      else { // split: 段落ごとに英語=ロバート / 日本語=自分
-        const ps = n.split('\n').map(x=>x.trim()).filter(Boolean);
-        row.robert_en = ps.filter(x=>!isJa(x)).join('\n'); row.note_ja = ps.filter(isJa).join('\n');
-      }
-      return row;
-    });
+    rows = rowsFromTemplate(newDocxTemplate, lang, notesMode);
   } else {
     if(!newUtts) return toast('先に「話者を検出」してください', true);
     const labels = {};
@@ -766,11 +767,7 @@ $('new-create').onclick = async ()=>{
     raw_transcript: $('new-text').value || null, speaker_map, rows, consultant: payloadConsultant,
     status: newDocxTemplate ? (rows.some(r=>r.robert_en||r.robert_ja) ? 'reviewed' : 'self_review') : 'draft',
   };
-  if(newDocxTemplate){
-    const isJa = t => (t.match(/[\u3040-\u30ff\u4e00-\u9fff]/g)||[]).length > t.length*0.2;
-    const ex = [...newDocxTemplate.extraBefore, ...newDocxTemplate.extraAfter].filter(p=>p.length>20);
-    payload.robert_overall_en = ex.filter(p=>!isJa(p)).join('\n\n') || null; payload.robert_overall_ja = ex.filter(isJa).join('\n\n') || null;
-  }
+  if(newDocxTemplate){ const o = overallFromTemplate(newDocxTemplate); payload.robert_overall_en = o.en; payload.robert_overall_ja = o.ja; }
   const { data, error } = await supabase.from('sc_reports').insert(payload).select().single();
   if(error) return toast('保存エラー: '+error.message, true);
   if(newFile){
@@ -796,11 +793,19 @@ function rowsFromTemplate(tpl, lang, notesMode){
   return tpl.rows.map((r,i)=>{
     const row = { id:uid(), seq:i+1, speaker:r.speaker, name:'', ja:lang==='ja'?r.text:'', en:lang==='en'?r.text:'', note_ja:'', note_en:'', robert_en:'', robert_ja:'', tags:[], deleted:false };
     const n = r.note||''; if(!n) return row;
-    if(notesMode==='own'){ if(isJa(n)) row.note_ja=n; else row.note_en=n; }
-    else if(notesMode==='robert'){ if(isJa(n)) row.robert_ja=n; else row.robert_en=n; }
+    const mode = (notesMode==='bold' && !tpl.hasBold) ? 'split' : notesMode;
+    if(mode==='bold'){ const b=r.note_bold||'', pl=r.note_plain||''; if(isJa(b)) row.robert_ja=b; else row.robert_en=b; if(isJa(pl)) row.note_ja=pl; else row.note_en=pl; }
+    else if(mode==='own'){ if(isJa(n)) row.note_ja=n; else row.note_en=n; }
+    else if(mode==='robert'){ if(isJa(n)) row.robert_ja=n; else row.robert_en=n; }
     else { const ps = n.split('\n').map(x=>x.trim()).filter(Boolean); row.robert_en = ps.filter(x=>!isJa(x)).join('\n'); row.note_ja = ps.filter(isJa).join('\n'); }
     return row;
   });
+}
+function overallFromTemplate(tpl){
+  const isJaP = p => (p.match(/[\u3040-\u30ff\u4e00-\u9fff]/g)||[]).length > p.length*0.2;
+  const ex = tpl.hasBold ? tpl.extraBold : [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
+  const exAll = [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
+  return { en: ex.filter(p=>!isJaP(p)).join('\n\n') || null, ja: exAll.filter(isJaP).join('\n\n') || null };
 }
 async function bulkImport(files){
   files = files.filter(f=>/\.docx$/i.test(f.name));
@@ -819,13 +824,13 @@ async function bulkImport(files){
       const rows = rowsFromTemplate(tpl, lang, notesMode);
       let date=null; if(tpl.head.date){ const d=new Date(tpl.head.date); if(!isNaN(d)) date=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
       if(!date){ const m=f.name.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/); if(m) date=`${m[1]}-${m[2]}-${m[3]}`; }
-      const ex = [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
-      const hasRobert = rows.some(r=>r.robert_en||r.robert_ja) || ex.length>0;
+      const o = overallFromTemplate(tpl);
+      const hasRobert = rows.some(r=>r.robert_en||r.robert_ja) || !!(o.en||o.ja);
       const payload = {
         title: f.name.replace(/\.docx$/i,''), consultant: (tpl.head.consultant && !/\t/.test(tpl.head.consultant)) ? tpl.head.consultant : 'Chica',
         client_label: tpl.head.client||'', session_date: date, length_min: tpl.head.length||null, rows,
         status: hasRobert ? 'reviewed' : 'self_review',
-        robert_overall_en: ex.filter(p=>!isJaP(p)).join('\n\n') || null, robert_overall_ja: ex.filter(isJaP).join('\n\n') || null,
+        robert_overall_en: o.en, robert_overall_ja: o.ja,
       };
       const { data, error } = await supabase.from('sc_reports').insert(payload).select().single();
       if(error){ line(`✕ ${esc(f.name)} — ${esc(error.message)}`, false); continue; }
@@ -1004,7 +1009,7 @@ function renderPanel(){
     </div>
     ${cur.submitted_at?`<p class="hint" style="margin-top:10px;">提出済み: ${new Date(cur.submitted_at).toLocaleString('ja-JP')} ${filesHtml('submitted')}</p>`:''}</div>`;
   if(curStep===5) h = `<div class="card"><h3>⑤ ロバートのレビュー — 戻ってきたWordを読み込む</h3>
-    <p class="hint">ロバートが Notes 列に書き込んで返してきたWordをここに入れると、提出時のスナップショットと比べてロバートの追記分だけを各行に取り出します。末尾や冒頭の総評もまとめて拾います。手で貼り付けたい場合は各行の「＋ロバートのコメント」から。</p>
+    <p class="hint">ロバートが Notes 列に<b>太字</b>で書き込んで返してきたWordをここに入れると、太字の部分だけをロバートのコメントとして各行に取り出します（太字がない場合は提出時のスナップショットとの差分で判定）。表の外に太字で書かれた総評も拾います。取り込んだら「Bob: 和訳」を押すと、元の日本語のやり取りの横にロバートのコメントの和訳が並びます。手で貼り付けたい場合は各行の「＋ロバートのコメント」から。</p>
     <div class="dropzone" id="rob-drop">戻ってきた .docx をドロップ / クリックして選択</div><input type="file" id="rob-file" accept=".docx" class="hidden">
     <div class="row" style="margin-top:12px;">
       <button class="btn btn-bob" id="act-ja">Bob: ロバートのコメントを和訳（未訳分）</button>
@@ -1030,7 +1035,7 @@ function renderPanel(){
     </div>
     <div class="fld"><label>次のセッションで試すこと</label><textarea id="learn-next" rows="3">${esc(L.next||'')}</textarea></div>
     <div class="fld"><label>このセッションのテーマ・タグ</label><div class="row" id="learn-tags">${cur.learning_tags.map(t=>tagChip(t,'clickable')).join('')}<span class="tag-add" id="learn-tag-add">＋タグ</span></div></div>
-    <div class="row"><button class="btn btn-bob btn-sm" id="act-summarize">Bob: ロバートのコメントから学びの下書きを作る</button><span id="prog-6"></span><span style="flex:1"></span><button class="btn btn-primary" id="act-to-done">学び整理済みにする</button></div>
+    <div class="row"><button class="btn btn-bob btn-sm" id="act-summarize">Bob: ロバートのコメントから学びの下書きを作る</button><span id="prog-6"></span><span style="flex:1"></span><button class="btn btn-sm" id="act-word-final">完成版Word（日本語＋ロバートの和訳）</button><button class="btn btn-sm" id="act-word-both6">日英対訳Word（レビュー込み）</button><button class="btn btn-primary" id="act-to-done">学び整理済みにする</button></div>
     ${marked.length?`<details style="margin-top:14px;"><summary class="hint" style="cursor:pointer;">ロバートのコメント一覧（${marked.length}）</summary>${marked.map(r=>`<div class="learn-item"><div class="ctx">#${numOf(r)} ${esc(spkDesc(r))}: ${esc((r.ja||r.en).slice(0,80))}${(r.ja||r.en).length>80?'…':''}</div><div class="rb">${esc(r.robert_ja||r.robert_en)}</div><div class="tagrow">${(r.tags||[]).map(t=>tagChip(t)).join('')}</div></div>`).join('')}</details>`:''}
     </div>`;
   }
@@ -1052,6 +1057,8 @@ function bindPanel(){
   on('act-ja', bobTranslateRobert);
   on('act-to-6', ()=>{ curStep=6; renderSteps(); renderPanel(); });
   on('act-summarize', bobLearningDraft);
+  on('act-word-final', ()=>exportWord('ja'));
+  on('act-word-both6', ()=>exportWord('both'));
   on('act-to-done', ()=>{ setStatus('learned'); toast('学び整理済みにしました'); });
   on('learn-tag-add', e=>openLearnTagPopover(e));
   const rd=$('rob-drop'); if(rd){ rd.onclick=()=>$('rob-file').click(); rd.ondragover=e=>{e.preventDefault(); rd.classList.add('over');}; rd.ondragleave=()=>rd.classList.remove('over'); rd.ondrop=e=>{e.preventDefault(); rd.classList.remove('over'); if(e.dataTransfer.files[0]) importReturned(e.dataTransfer.files[0]);}; $('rob-file').onchange=e=>{ if(e.target.files[0]) importReturned(e.target.files[0]); }; }
@@ -1159,7 +1166,7 @@ async function exportWord(mode, store=false){
     const textParts = mode==='en' ? [{text:pre+(r.en||r.ja)}] : mode==='ja' ? [{text:pre+r.ja}] : [{text:pre+r.ja},{text:pre+r.en,color:'3F4C5A'}];
     const noteParts = [];
     if(mode==='en'){ noteParts.push({text:r.note_en||r.note_ja}); if(store===false && r.robert_en) noteParts.push({text:r.robert_en, color:'9C3B2E', label:'Robert'}); }
-    else if(mode==='ja'){ noteParts.push({text:r.note_ja}); if(r.robert_ja||r.robert_en) noteParts.push({text:r.robert_ja||r.robert_en, color:'9C3B2E', label:'Robert'}); }
+    else if(mode==='ja'){ noteParts.push({text:r.note_ja}); if(r.robert_ja||r.robert_en) noteParts.push({text:r.robert_ja||r.robert_en, color:'9C3B2E', label:'Robert'}); if(r.robert_ja && r.robert_en) noteParts.push({text:r.robert_en, color:'888888', size:16}); }
     else { noteParts.push({text:r.note_ja}); if(r.note_en) noteParts.push({text:r.note_en,color:'3F4C5A'}); if(r.robert_en) noteParts.push({text:r.robert_en,color:'9C3B2E',label:'Robert'}); if(r.robert_ja) noteParts.push({text:r.robert_ja,color:'9C3B2E'}); if(r.tags?.length) noteParts.push({text:'['+r.tags.join(' / ')+']', color:'888888', size:14}); }
     rows.push(new D.TableRow({ children:[
       cell(cellParas([{text:String(n)}]), W[0]),
@@ -1206,20 +1213,24 @@ async function importReturned(file){
     const snap = cur.submitted_snapshot || liveRows().map(r=>({ id:r.id, num:numOf(r), speaker:r.speaker, en:r.en, note_en:r.note_en||'' }));
     let found=0, unmatched=0;
     const norm = s => (s||'').replace(/\s+/g,' ').trim();
+    const useBold = tpl.hasBold;   // ロバートは太字で書く → 太字があればそれを優先、なければ提出時との差分
     for(const rr of tpl.rows){
       const s = snap.find(x=>x.num===rr.num) || snap[rr.num-1];
       if(!s){ unmatched++; continue; }
       const row = cur.rows.find(x=>x.id===s.id); if(!row) continue;
-      const ret = norm(rr.note), own = norm(s.note_en);
       let added = '';
-      if(!ret) continue;
-      if(own && ret.startsWith(own)) added = ret.slice(own.length).trim();
-      else if(own && ret.includes(own)) added = ret.replace(own,'').trim();
-      else if(own && ret===own) added='';
-      else added = ret;          // 自分のノートがない行に書かれている = ロバート
+      if(useBold){ added = (rr.note_bold||'').trim(); }
+      else {
+        const ret = norm(rr.note), own = norm(s.note_en);
+        if(!ret) continue;
+        if(own && ret.startsWith(own)) added = ret.slice(own.length).trim();
+        else if(own && ret.includes(own)) added = ret.replace(own,'').trim();
+        else if(own && ret===own) added='';
+        else added = ret;          // 自分のノートがない行に書かれている = ロバート
+      }
       if(added){ row.robert_en = added; found++; }
     }
-    const extras = [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
+    const extras = useBold ? tpl.extraBold : [...tpl.extraBefore, ...tpl.extraAfter].filter(p=>p.length>20);
     const isJa = p => (p.match(/[\u3040-\u30ff\u4e00-\u9fff]/g)||[]).length > p.length*0.2;
     const exEn = extras.filter(p=>!isJa(p)).join('\n\n'), exJa = extras.filter(isJa).join('\n\n');
     if(exEn && !(cur.robert_overall_en||'').includes(exEn)) cur.robert_overall_en = [cur.robert_overall_en, exEn].filter(Boolean).join('\n\n');
@@ -1229,7 +1240,7 @@ async function importReturned(file){
     if(!error) cur.files.push({ kind:'returned', path, name:file.name, at:new Date().toISOString() });
     if(STATUS_ORDER.indexOf(cur.status)<4) cur.status='reviewed';
     await saveCur(); renderReport();
-    toast(`ロバートのコメントを ${found} 行に取り込みました${unmatched?`（対応行なし ${unmatched}）`:''}`);
+    toast(`ロバートのコメントを ${found} 行に取り込みました（${useBold?'太字を抽出':'提出時との差分'}${unmatched?` · 対応行なし ${unmatched}`:''}）`);
   }catch(e){ toast('読み込みエラー: '+e.message, true); }
 }
 
